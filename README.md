@@ -71,6 +71,7 @@ python tools/configure_sensor.py --discover --discover-port 1399
 ```
 
 > **Tip**: If your machine is connected via Ethernet to the same network, you only need to switch WiFi – Ethernet stays connected.
+> **HACS install path**: The packaged tool is also available under `custom_components/wit_901_wifi/tools/configure_sensor.py`.
 
 ### Step 2: Configure the integration in HA
 
@@ -85,6 +86,11 @@ If not already done via the Config Flow:
 ## CLI Tool (`tools/configure_sensor.py`)
 
 Standalone tool for sensor configuration, independent of Home Assistant.
+
+For HACS deployments, the same tool is included under:
+
+- `custom_components/wit_901_wifi/tools/configure_sensor.py`
+- `custom_components/wit_901_wifi/docs/WT901WIFI protocol.pdf`
 
 ```bash
 # Full provisioning (WiFi + streaming target)

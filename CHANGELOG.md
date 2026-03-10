@@ -7,6 +7,14 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.1.3] - 2026-03-10
+
+### Added
+- Bundled `docs/` and `tools/` into `custom_components/wit_901_wifi/` so they are included in HACS integration installs.
+- Added packaged copies:
+  - `custom_components/wit_901_wifi/docs/WT901WIFI protocol.pdf`
+  - `custom_components/wit_901_wifi/tools/configure_sensor.py`
+
 ## [0.1.2] - 2026-03-10
 
 ### Fixed
