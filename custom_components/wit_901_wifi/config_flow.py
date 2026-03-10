@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import logging
 import socket
 from collections.abc import Mapping
 from contextlib import suppress
@@ -33,6 +34,8 @@ from .const import (
 )
 from .protocol import parse_streaming_frame
 from .wifi_setup import async_probe_sensor, async_send_ipwifi_command
+
+_LOGGER = logging.getLogger(__name__)
 
 CONF_SENSOR_HOST = "sensor_host"
 CONF_SENSOR_PORT = "sensor_port"
@@ -393,15 +396,21 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_progress(
                 step_id="await_frame",
                 progress_action="waiting_for_frame",
+                progress_task=self._discovery_task,
             )
 
         if not self._discovery_task.done():
             return self.async_show_progress(
                 step_id="await_frame",
                 progress_action="waiting_for_frame",
+                progress_task=self._discovery_task,
             )
 
-        discovered = self._discovery_task.result()
+        try:
+            discovered = self._discovery_task.result()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Await-frame discovery failed: %s", err)
+            discovered = None
         self._discovery_task = None
         self._discovered_device_id = discovered
 

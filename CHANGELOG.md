@@ -7,6 +7,12 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.1.5] - 2026-03-10
+
+### Fixed
+- Config-flow await-frame progress now tracks the actual discovery task (`progress_task`), preventing setup from hanging on "waiting for first frame" while frames are already received.
+- Added defensive error handling/logging when temporary discovery listener fails, with fallback to manual device-id step.
+
 ## [0.1.4] - 2026-03-10
 
 ### Changed
