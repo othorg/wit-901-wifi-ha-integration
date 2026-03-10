@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 from collections.abc import Callable
 from typing import Any
 
@@ -99,11 +100,36 @@ class WitListener:
         self._server: asyncio.AbstractServer | None = None
 
     async def async_start(self) -> None:
-        """Start the listener."""
+        """Start the listener.
+
+        Retries up to 3 times with a short delay to handle port release
+        during integration reload (unload → setup race condition).
+        """
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                await self._bind_listener()
+                return
+            except OSError as err:
+                if attempt < max_attempts:
+                    _LOGGER.debug(
+                        "Bind attempt %s/%s failed (%s), retrying in 1s",
+                        attempt, max_attempts, err,
+                    )
+                    await asyncio.sleep(1)
+                else:
+                    raise
+
+    async def _bind_listener(self) -> None:
+        """Bind the UDP or TCP listener."""
         if self._protocol_type == PROTOCOL_UDP:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setblocking(False)
+            sock.bind((self._host, self._port))
             transport, _ = await self._loop.create_datagram_endpoint(
                 lambda: WitUdpProtocol(self._device_id, self._on_frame),
-                local_addr=(self._host, self._port),
+                sock=sock,
             )
             self._transport = transport
             _LOGGER.info("UDP listener started on %s:%s", self._host, self._port)
@@ -112,6 +138,7 @@ class WitListener:
                 lambda: WitTcpProtocol(self._device_id, self._on_frame),
                 self._host,
                 self._port,
+                reuse_address=True,
             )
             _LOGGER.info("TCP listener started on %s:%s", self._host, self._port)
         else:

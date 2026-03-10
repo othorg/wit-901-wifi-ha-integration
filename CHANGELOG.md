@@ -7,6 +7,12 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.2.1] - 2026-03-10
+
+### Fixed
+- Listener socket now uses `SO_REUSEADDR` (UDP) and `reuse_address=True` (TCP) to prevent "Address in use" errors during integration reload.
+- Listener bind retries up to 3 times with 1s delay to handle port release race condition on options change.
+
 ## [0.2.0] - 2026-03-10
 
 ### Added
