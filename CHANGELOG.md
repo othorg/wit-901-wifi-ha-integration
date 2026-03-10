@@ -7,6 +7,13 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.1.2] - 2026-03-10
+
+### Fixed
+- Config-flow await-frame cleanup: discovery listener task is cancelled when the flow is aborted/closed.
+- Await-frame timeout is now bounded to 30-90 seconds to avoid long-lived temporary listener binds.
+- Config-flow progress handling aligned to `async_show_progress_done(...)` pattern.
+
 ## [0.1.1] - 2026-03-10
 
 ### Added

@@ -6,6 +6,7 @@ import asyncio
 import ipaddress
 import socket
 from collections.abc import Mapping
+from contextlib import suppress
 from typing import Any
 
 import voluptuous as vol
@@ -42,6 +43,8 @@ CONF_TARGET_IP = "target_ip"
 DEFAULT_SENSOR_HOST = "192.168.4.1"
 DEFAULT_SENSOR_PORT = 9250
 DEFAULT_DISCOVERY_TIMEOUT = 45
+MIN_DISCOVERY_TIMEOUT = 30
+MAX_DISCOVERY_TIMEOUT = 90
 WILDCARD_HOSTS = {"0.0.0.0", "::"}
 
 
@@ -94,6 +97,14 @@ def _merge_entry_config(entry: config_entries.ConfigEntry) -> dict[str, Any]:
     merged = dict(entry.data)
     merged.update(entry.options)
     return merged
+
+
+def _compute_discovery_timeout(listener_timeout: int) -> int:
+    """Compute bounded await-frame timeout in seconds."""
+    return max(
+        MIN_DISCOVERY_TIMEOUT,
+        min(MAX_DISCOVERY_TIMEOUT, listener_timeout * 3),
+    )
 
 
 class _CaptureUdpProtocol(asyncio.DatagramProtocol):
@@ -179,6 +190,7 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._pending: dict[str, Any] = {}
         self._discovery_task: asyncio.Task[str | None] | None = None
         self._provisioning_sent = False
+        self._discovered_device_id: str | None = None
 
     @staticmethod
     @callback
@@ -366,10 +378,10 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="missing_listener_config")
 
         if self._discovery_task is None:
-            timeout_seconds = max(
-                DEFAULT_DISCOVERY_TIMEOUT,
-                int(self._pending.get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS)) * 3,
+            listener_timeout = int(
+                self._pending.get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS)
             )
+            timeout_seconds = _compute_discovery_timeout(listener_timeout)
             self._discovery_task = self.hass.async_create_task(
                 _await_first_device_id(
                     protocol=self._pending[CONF_PROTOCOL],
@@ -391,19 +403,27 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         discovered = self._discovery_task.result()
         self._discovery_task = None
+        self._discovered_device_id = discovered
 
         if discovered:
-            return await self._create_entry(discovered)
+            return self.async_show_progress_done(next_step_id="finish_discovery")
 
-        return self.async_show_form(
-            step_id="manual_device_id",
-            data_schema=vol.Schema({vol.Required(CONF_DEVICE_ID): str}),
-            errors={"base": "frame_timeout"},
-        )
+        return self.async_show_progress_done(next_step_id="manual_device_id")
+
+    async def async_step_finish_discovery(
+        self,
+        user_input: Mapping[str, Any] | None = None,
+    ):
+        """Finalize entry after successful automatic discovery."""
+        if self._discovered_device_id:
+            return await self._create_entry(self._discovered_device_id)
+        return await self.async_step_manual_device_id()
 
     async def async_step_manual_device_id(self, user_input: Mapping[str, Any] | None = None):
         """Fallback step when automatic discovery timed out."""
         errors: dict[str, str] = {}
+        if user_input is None:
+            errors["base"] = "frame_timeout"
         if user_input is not None:
             device_id = str(user_input.get(CONF_DEVICE_ID, "")).strip().upper()
             if not _is_valid_device_id(device_id):
@@ -429,6 +449,15 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured(updates=data)
         title = str(data.get(CONF_NAME) or f"{NAME} {device_id}")
         return self.async_create_entry(title=title, data=data)
+
+    async def async_remove(self) -> None:
+        """Cleanup flow resources when setup flow is cancelled/removed."""
+        if self._discovery_task is None:
+            return
+        self._discovery_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await self._discovery_task
+        self._discovery_task = None
 
     def _has_existing_listener_conflict(self, protocol: str, host: str, port: int) -> bool:
         """Return True if another configured entry already occupies the same listener space."""
