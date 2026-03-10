@@ -35,9 +35,13 @@ import socket
 import sys
 from pathlib import Path
 
-# Add project root to path so we can reuse the protocol parser
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_PROJECT_ROOT))
+# Add project root to path so we can reuse the protocol parser.
+# Works from both repo root (tools/) and HACS install (custom_components/wit_901_wifi/tools/).
+_TOOL_DIR = Path(__file__).resolve().parent
+for _candidate in (_TOOL_DIR.parent, _TOOL_DIR.parent.parent.parent):
+    if (_candidate / "custom_components" / "wit_901_wifi" / "protocol.py").exists():
+        sys.path.insert(0, str(_candidate))
+        break
 
 
 def probe_sensor(host: str, port: int) -> bool:
