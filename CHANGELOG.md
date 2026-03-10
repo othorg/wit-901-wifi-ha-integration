@@ -7,6 +7,13 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.2.0] - 2026-03-10
+
+### Added
+- Configurable update interval: presets Live (5 Hz), 10s, 1min, or custom value in seconds.
+- New config/options fields: `update_interval` and `update_interval_custom`.
+- English and German translations for update interval fields and error messages.
+
 ## [0.1.5] - 2026-03-10
 
 ### Fixed

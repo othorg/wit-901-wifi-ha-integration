@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "wit_901_wifi"
 NAME = "WIT 901 WIFI"
-VERSION = "0.1.5"
+VERSION = "0.2.0"
 
 PLATFORMS: tuple[str, ...] = ("sensor", "binary_sensor")
 
@@ -13,6 +13,18 @@ DEFAULT_LISTEN_PORT = 1399
 DEFAULT_PROTOCOL = "udp"
 DEFAULT_TIMEOUT_SECONDS = 10
 MIN_UPDATE_INTERVAL_S = 0.2  # max ~5 state updates per second
+
+CONF_UPDATE_INTERVAL = "update_interval"
+DEFAULT_UPDATE_INTERVAL = "live"
+
+# Preset keys → throttle interval in seconds
+UPDATE_INTERVAL_PRESETS: dict[str, float] = {
+    "live": MIN_UPDATE_INTERVAL_S,
+    "10s": 10.0,
+    "1min": 60.0,
+}
+
+CONF_UPDATE_INTERVAL_CUSTOM = "update_interval_custom"
 
 CONF_PROTOCOL = "protocol"
 CONF_LISTEN_HOST = "listen_host"

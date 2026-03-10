@@ -10,7 +10,9 @@
           "protocol": "Protokoll",
           "listen_host": "Listen-Host",
           "listen_port": "Listen-Port",
-          "timeout_seconds": "Timeout (Sekunden)"
+          "timeout_seconds": "Timeout (Sekunden)",
+          "update_interval": "Aktualisierungsintervall",
+          "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)"
         }
       },
       "sensor_setup_menu": {
@@ -49,6 +51,8 @@
       "invalid_port": "Ungültiger Listen-Port (1024-65535)",
       "invalid_device_id": "Device-ID muss WT55######## entsprechen",
       "invalid_timeout": "Timeout muss zwischen 3 und 300 Sekunden liegen",
+      "invalid_update_interval": "Ungültiges Aktualisierungsintervall",
+      "invalid_update_interval_custom": "Benutzerdefiniertes Intervall muss mindestens 0,2 Sekunden betragen",
       "address_in_use": "Listener kollidiert mit einem bereits konfigurierten Eintrag",
       "cannot_bind": "Listener-Socket kann auf dieser Adresse nicht gebunden werden",
       "sensor_unreachable": "Sensor-Host ist von Home Assistant nicht erreichbar",
@@ -70,7 +74,9 @@
           "listen_host": "Listen-Host",
           "listen_port": "Listen-Port",
           "device_id": "Device-ID (WT55 + 8 Ziffern)",
-          "timeout_seconds": "Timeout (Sekunden)"
+          "timeout_seconds": "Timeout (Sekunden)",
+          "update_interval": "Aktualisierungsintervall",
+          "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)"
         }
       }
     }

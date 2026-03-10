@@ -21,16 +21,21 @@ from .const import (
     CONF_LISTEN_PORT,
     CONF_PROTOCOL,
     CONF_TIMEOUT_SECONDS,
+    CONF_UPDATE_INTERVAL,
+    CONF_UPDATE_INTERVAL_CUSTOM,
     DEFAULT_LISTEN_HOST,
     DEFAULT_LISTEN_PORT,
     DEFAULT_PROTOCOL,
     DEFAULT_TIMEOUT_SECONDS,
+    DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     FRAME_HEADER,
     FRAME_LENGTH,
+    MIN_UPDATE_INTERVAL_S,
     NAME,
     PROTOCOL_TCP,
     PROTOCOL_UDP,
+    UPDATE_INTERVAL_PRESETS,
 )
 from .protocol import parse_streaming_frame
 from .wifi_setup import async_probe_sensor, async_send_ipwifi_command
@@ -49,6 +54,8 @@ DEFAULT_DISCOVERY_TIMEOUT = 45
 MIN_DISCOVERY_TIMEOUT = 30
 MAX_DISCOVERY_TIMEOUT = 90
 WILDCARD_HOSTS = {"0.0.0.0", "::"}
+
+VALID_UPDATE_INTERVALS = list(UPDATE_INTERVAL_PRESETS.keys()) + ["custom"]
 
 
 def _is_valid_ipv4(host: str) -> bool:
@@ -222,10 +229,22 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except (TypeError, ValueError):
                 timeout = -1
 
+            update_interval = str(
+                validated.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+            ).lower()
+            try:
+                update_custom = float(
+                    validated.get(CONF_UPDATE_INTERVAL_CUSTOM, 0)
+                )
+            except (TypeError, ValueError):
+                update_custom = 0.0
+
             validated[CONF_PROTOCOL] = protocol
             validated[CONF_LISTEN_HOST] = host
             validated[CONF_LISTEN_PORT] = port
             validated[CONF_TIMEOUT_SECONDS] = timeout
+            validated[CONF_UPDATE_INTERVAL] = update_interval
+            validated[CONF_UPDATE_INTERVAL_CUSTOM] = update_custom
 
             if protocol not in {PROTOCOL_UDP, PROTOCOL_TCP}:
                 errors[CONF_PROTOCOL] = "invalid_protocol"
@@ -235,6 +254,10 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_LISTEN_PORT] = "invalid_port"
             if not 3 <= timeout <= 300:
                 errors[CONF_TIMEOUT_SECONDS] = "invalid_timeout"
+            if update_interval not in VALID_UPDATE_INTERVALS:
+                errors[CONF_UPDATE_INTERVAL] = "invalid_update_interval"
+            elif update_interval == "custom" and update_custom < MIN_UPDATE_INTERVAL_S:
+                errors[CONF_UPDATE_INTERVAL_CUSTOM] = "invalid_update_interval_custom"
 
             if (
                 not errors
@@ -277,6 +300,14 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_TIMEOUT_SECONDS,
                     default=(user_input or {}).get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS),
                 ): int,
+                vol.Required(
+                    CONF_UPDATE_INTERVAL,
+                    default=(user_input or {}).get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                ): vol.In(VALID_UPDATE_INTERVALS),
+                vol.Optional(
+                    CONF_UPDATE_INTERVAL_CUSTOM,
+                    default=(user_input or {}).get(CONF_UPDATE_INTERVAL_CUSTOM, 0),
+                ): vol.Coerce(float),
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -534,11 +565,29 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
             except (TypeError, ValueError):
                 timeout = -1
 
+            update_interval = str(
+                validated.get(
+                    CONF_UPDATE_INTERVAL,
+                    current.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                )
+            ).lower()
+            try:
+                update_custom = float(
+                    validated.get(
+                        CONF_UPDATE_INTERVAL_CUSTOM,
+                        current.get(CONF_UPDATE_INTERVAL_CUSTOM, 0),
+                    )
+                )
+            except (TypeError, ValueError):
+                update_custom = 0.0
+
             validated[CONF_PROTOCOL] = protocol
             validated[CONF_LISTEN_HOST] = host
             validated[CONF_LISTEN_PORT] = port
             validated[CONF_DEVICE_ID] = device_id
             validated[CONF_TIMEOUT_SECONDS] = timeout
+            validated[CONF_UPDATE_INTERVAL] = update_interval
+            validated[CONF_UPDATE_INTERVAL_CUSTOM] = update_custom
 
             if protocol not in {PROTOCOL_UDP, PROTOCOL_TCP}:
                 errors[CONF_PROTOCOL] = "invalid_protocol"
@@ -550,6 +599,10 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_DEVICE_ID] = "invalid_device_id"
             if not 3 <= timeout <= 300:
                 errors[CONF_TIMEOUT_SECONDS] = "invalid_timeout"
+            if update_interval not in VALID_UPDATE_INTERVALS:
+                errors[CONF_UPDATE_INTERVAL] = "invalid_update_interval"
+            elif update_interval == "custom" and update_custom < MIN_UPDATE_INTERVAL_S:
+                errors[CONF_UPDATE_INTERVAL_CUSTOM] = "invalid_update_interval_custom"
 
             if (
                 not errors
@@ -607,6 +660,18 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                         DEFAULT_TIMEOUT_SECONDS,
                     ),
                 ): int,
+                vol.Required(
+                    CONF_UPDATE_INTERVAL,
+                    default=(user_input or current).get(
+                        CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                    ),
+                ): vol.In(VALID_UPDATE_INTERVALS),
+                vol.Optional(
+                    CONF_UPDATE_INTERVAL_CUSTOM,
+                    default=(user_input or current).get(
+                        CONF_UPDATE_INTERVAL_CUSTOM, 0
+                    ),
+                ): vol.Coerce(float),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
