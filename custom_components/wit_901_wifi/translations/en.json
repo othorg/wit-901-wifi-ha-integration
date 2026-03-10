@@ -1,0 +1,92 @@
+{
+  "title": "WIT 901 WIFI",
+  "config": {
+    "step": {
+      "user": {
+        "title": "WIT 901 WIFI",
+        "description": "Configure listening endpoint for WT901WIFI streaming frames.",
+        "data": {
+          "name": "Name",
+          "protocol": "Protocol",
+          "listen_host": "Listen host",
+          "listen_port": "Listen port",
+          "timeout_seconds": "Timeout (seconds)"
+        }
+      },
+      "sensor_setup_menu": {
+        "title": "Sensor setup",
+        "description": "Optionally provision sensor WiFi now, or skip directly to device detection.",
+        "menu_options": {
+          "sensor_setup": "Provision sensor WiFi",
+          "await_frame": "Skip and wait for frame"
+        }
+      },
+      "sensor_setup": {
+        "title": "Sensor WiFi provisioning",
+        "description": "Best effort: works only if the Home Assistant host can reach the sensor (usually 192.168.4.1:9250 in AP mode).",
+        "data": {
+          "sensor_host": "Sensor host",
+          "sensor_port": "Sensor port",
+          "target_ip": "Target IP (Home Assistant)",
+          "wifi_ssid": "WiFi SSID",
+          "wifi_password": "WiFi password"
+        }
+      },
+      "manual_device_id": {
+        "title": "Enter device ID",
+        "description": "No frame received in time. Enter device ID manually.",
+        "data": {
+          "device_id": "Device ID (WT55 + 8 digits)"
+        }
+      }
+    },
+    "progress": {
+      "waiting_for_frame": "Waiting for first sensor frame to auto-detect device ID..."
+    },
+    "error": {
+      "invalid_protocol": "Invalid protocol",
+      "invalid_host": "Invalid listen host (IPv4 required)",
+      "invalid_port": "Invalid listen port (1024-65535)",
+      "invalid_device_id": "Device ID must match WT55########",
+      "invalid_timeout": "Timeout must be between 3 and 300 seconds",
+      "address_in_use": "Listener conflicts with an already configured entry",
+      "cannot_bind": "Cannot bind listener socket to this address",
+      "sensor_unreachable": "Sensor host is not reachable from Home Assistant",
+      "cannot_send_command": "Could not send provisioning command to sensor",
+      "frame_timeout": "No sensor frame received within timeout",
+      "required": "Required field"
+    },
+    "abort": {
+      "missing_listener_config": "Listener configuration is missing. Restart setup."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "WIT 901 WIFI options",
+        "description": "Update listener and device options.",
+        "data": {
+          "protocol": "Protocol",
+          "listen_host": "Listen host",
+          "listen_port": "Listen port",
+          "device_id": "Device ID (WT55 + 8 digits)",
+          "timeout_seconds": "Timeout (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "roll": { "name": "Roll" },
+      "pitch": { "name": "Pitch" },
+      "yaw": { "name": "Yaw" },
+      "temperature": { "name": "Temperature" },
+      "battery_voltage": { "name": "Battery voltage" },
+      "battery_percentage": { "name": "Battery" },
+      "rssi": { "name": "Signal strength" }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" }
+    }
+  }
+}

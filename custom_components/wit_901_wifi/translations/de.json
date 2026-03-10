@@ -1,0 +1,92 @@
+{
+  "title": "WIT 901 WIFI",
+  "config": {
+    "step": {
+      "user": {
+        "title": "WIT 901 WIFI",
+        "description": "Konfiguriere den lokalen Listener für WT901WIFI-Streaming-Frames.",
+        "data": {
+          "name": "Name",
+          "protocol": "Protokoll",
+          "listen_host": "Listen-Host",
+          "listen_port": "Listen-Port",
+          "timeout_seconds": "Timeout (Sekunden)"
+        }
+      },
+      "sensor_setup_menu": {
+        "title": "Sensor-Setup",
+        "description": "Optional jetzt Sensor-WLAN konfigurieren oder direkt zur Geräteerkennung wechseln.",
+        "menu_options": {
+          "sensor_setup": "Sensor-WLAN konfigurieren",
+          "await_frame": "Überspringen und auf Frame warten"
+        }
+      },
+      "sensor_setup": {
+        "title": "Sensor-WLAN-Provisionierung",
+        "description": "Best Effort: funktioniert nur, wenn der Home-Assistant-Host den Sensor erreichen kann (typisch 192.168.4.1:9250 im AP-Modus).",
+        "data": {
+          "sensor_host": "Sensor-Host",
+          "sensor_port": "Sensor-Port",
+          "target_ip": "Ziel-IP (Home Assistant)",
+          "wifi_ssid": "WLAN-SSID",
+          "wifi_password": "WLAN-Passwort"
+        }
+      },
+      "manual_device_id": {
+        "title": "Device-ID eingeben",
+        "description": "Kein Frame rechtzeitig empfangen. Gib die Device-ID manuell ein.",
+        "data": {
+          "device_id": "Device-ID (WT55 + 8 Ziffern)"
+        }
+      }
+    },
+    "progress": {
+      "waiting_for_frame": "Warte auf den ersten Sensor-Frame zur automatischen Device-ID-Erkennung..."
+    },
+    "error": {
+      "invalid_protocol": "Ungültiges Protokoll",
+      "invalid_host": "Ungültiger Listen-Host (IPv4 erforderlich)",
+      "invalid_port": "Ungültiger Listen-Port (1024-65535)",
+      "invalid_device_id": "Device-ID muss WT55######## entsprechen",
+      "invalid_timeout": "Timeout muss zwischen 3 und 300 Sekunden liegen",
+      "address_in_use": "Listener kollidiert mit einem bereits konfigurierten Eintrag",
+      "cannot_bind": "Listener-Socket kann auf dieser Adresse nicht gebunden werden",
+      "sensor_unreachable": "Sensor-Host ist von Home Assistant nicht erreichbar",
+      "cannot_send_command": "Provisionierungsbefehl konnte nicht gesendet werden",
+      "frame_timeout": "Kein Sensor-Frame innerhalb des Timeouts empfangen",
+      "required": "Pflichtfeld"
+    },
+    "abort": {
+      "missing_listener_config": "Listener-Konfiguration fehlt. Setup neu starten."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "WIT 901 WIFI Optionen",
+        "description": "Aktualisiere Listener- und Geräteoptionen.",
+        "data": {
+          "protocol": "Protokoll",
+          "listen_host": "Listen-Host",
+          "listen_port": "Listen-Port",
+          "device_id": "Device-ID (WT55 + 8 Ziffern)",
+          "timeout_seconds": "Timeout (Sekunden)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "roll": { "name": "Roll" },
+      "pitch": { "name": "Neigung" },
+      "yaw": { "name": "Gier" },
+      "temperature": { "name": "Temperatur" },
+      "battery_voltage": { "name": "Batteriespannung" },
+      "battery_percentage": { "name": "Batterie" },
+      "rssi": { "name": "Signalstärke" }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" }
+    }
+  }
+}

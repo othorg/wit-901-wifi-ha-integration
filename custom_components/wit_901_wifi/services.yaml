@@ -1,0 +1,65 @@
+configure_sensor:
+  name: Configure sensor
+  description: >-
+    Send a WiFi provisioning command to a WT901WIFI sensor.
+    The sensor will reboot and connect to the specified WiFi network,
+    then start streaming to the given target IP and port.
+    WiFi password is used only for the command payload and is never stored.
+  fields:
+    sensor_host:
+      name: Sensor host
+      description: IP address of the WT901WIFI sensor (e.g. 192.168.4.1 in AP mode).
+      required: true
+      example: "192.168.4.1"
+      selector:
+        text:
+    sensor_port:
+      name: Sensor port
+      description: The sensor's local UDP port (LOCALPORT register, default 9250).
+      required: false
+      default: 9250
+      selector:
+        number:
+          min: 1
+          max: 65535
+    wifi_ssid:
+      name: WiFi SSID
+      description: The 2.4 GHz WiFi network name the sensor should connect to.
+      required: true
+      example: "MyHomeWiFi"
+      selector:
+        text:
+    wifi_password:
+      name: WiFi password
+      description: WiFi password. Used only for the command payload, never stored or logged.
+      required: true
+      example: ""
+      selector:
+        text:
+          type: password
+    protocol:
+      name: Protocol
+      description: Streaming protocol (udp or tcp).
+      required: true
+      default: "udp"
+      selector:
+        select:
+          options:
+            - "udp"
+            - "tcp"
+    target_ip:
+      name: Target IP
+      description: IP address the sensor should stream to (your Home Assistant server).
+      required: true
+      example: "192.168.1.100"
+      selector:
+        text:
+    target_port:
+      name: Target port
+      description: Port the sensor should stream to.
+      required: true
+      default: 1399
+      selector:
+        number:
+          min: 1024
+          max: 65535

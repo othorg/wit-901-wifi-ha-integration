@@ -1,0 +1,597 @@
+"""Config flow for WIT 901 WIFI integration."""
+
+from __future__ import annotations
+
+import asyncio
+import ipaddress
+import socket
+from collections.abc import Mapping
+from typing import Any
+
+import voluptuous as vol
+from homeassistant import config_entries
+from homeassistant.const import CONF_NAME
+from homeassistant.core import callback
+
+from .const import (
+    CONF_DEVICE_ID,
+    CONF_LISTEN_HOST,
+    CONF_LISTEN_PORT,
+    CONF_PROTOCOL,
+    CONF_TIMEOUT_SECONDS,
+    DEFAULT_LISTEN_HOST,
+    DEFAULT_LISTEN_PORT,
+    DEFAULT_PROTOCOL,
+    DEFAULT_TIMEOUT_SECONDS,
+    DOMAIN,
+    FRAME_HEADER,
+    FRAME_LENGTH,
+    NAME,
+    PROTOCOL_TCP,
+    PROTOCOL_UDP,
+)
+from .protocol import parse_streaming_frame
+from .wifi_setup import async_probe_sensor, async_send_ipwifi_command
+
+CONF_SENSOR_HOST = "sensor_host"
+CONF_SENSOR_PORT = "sensor_port"
+CONF_WIFI_SSID = "wifi_ssid"
+CONF_WIFI_PASSWORD = "wifi_password"
+CONF_TARGET_IP = "target_ip"
+
+DEFAULT_SENSOR_HOST = "192.168.4.1"
+DEFAULT_SENSOR_PORT = 9250
+DEFAULT_DISCOVERY_TIMEOUT = 45
+WILDCARD_HOSTS = {"0.0.0.0", "::"}
+
+
+def _is_valid_ipv4(host: str) -> bool:
+    """Return True if host is a valid IPv4 address."""
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.version == 4
+
+
+def _is_valid_device_id(device_id: str) -> bool:
+    """Validate WT device id format."""
+    return len(device_id) == 12 and device_id.startswith("WT55") and device_id[4:].isdigit()
+
+
+def _hosts_conflict(host_a: str, host_b: str) -> bool:
+    """Return True when two bind hosts conflict for the same protocol+port."""
+    if host_a == host_b:
+        return True
+    return host_a in WILDCARD_HOSTS or host_b in WILDCARD_HOSTS
+
+
+def _can_bind_listener(host: str, port: int, protocol: str) -> bool:
+    """Try binding a listener socket to validate that address is usable."""
+    sock_type = socket.SOCK_DGRAM if protocol == PROTOCOL_UDP else socket.SOCK_STREAM
+    try:
+        with socket.socket(socket.AF_INET, sock_type) as sock:
+            sock.bind((host, port))
+            if protocol == PROTOCOL_TCP:
+                sock.listen(1)
+    except OSError:
+        return False
+    return True
+
+
+def _guess_local_ipv4() -> str:
+    """Best-effort local IPv4 detection for target_ip default."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return str(sock.getsockname()[0])
+    except OSError:
+        return ""
+
+
+def _merge_entry_config(entry: config_entries.ConfigEntry) -> dict[str, Any]:
+    """Merge entry data and options with options taking precedence."""
+    merged = dict(entry.data)
+    merged.update(entry.options)
+    return merged
+
+
+class _CaptureUdpProtocol(asyncio.DatagramProtocol):
+    """Capture first valid streaming frame over UDP."""
+
+    def __init__(self, fut: asyncio.Future[str]) -> None:
+        self._future = fut
+
+    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        parsed = parse_streaming_frame(data)
+        if parsed and not self._future.done():
+            self._future.set_result(parsed["device_id"])
+
+
+class _CaptureTcpProtocol(asyncio.Protocol):
+    """Capture first valid streaming frame over TCP."""
+
+    def __init__(self, fut: asyncio.Future[str]) -> None:
+        self._future = fut
+        self._buffer = bytearray()
+
+    def data_received(self, data: bytes) -> None:
+        self._buffer.extend(data)
+        while len(self._buffer) >= FRAME_LENGTH:
+            idx = self._buffer.find(FRAME_HEADER)
+            if idx < 0:
+                self._buffer.clear()
+                return
+            if idx > 0:
+                del self._buffer[:idx]
+            if len(self._buffer) < FRAME_LENGTH:
+                return
+            frame = bytes(self._buffer[:FRAME_LENGTH])
+            del self._buffer[:FRAME_LENGTH]
+            parsed = parse_streaming_frame(frame)
+            if parsed and not self._future.done():
+                self._future.set_result(parsed["device_id"])
+                return
+
+
+async def _await_first_device_id(
+    protocol: str,
+    host: str,
+    port: int,
+    timeout_seconds: int,
+) -> str | None:
+    """Wait for first valid frame and return discovered device_id."""
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[str] = loop.create_future()
+
+    transport: asyncio.BaseTransport | None = None
+    server: asyncio.AbstractServer | None = None
+    try:
+        if protocol == PROTOCOL_UDP:
+            transport, _ = await loop.create_datagram_endpoint(
+                lambda: _CaptureUdpProtocol(fut),
+                local_addr=(host, port),
+            )
+        else:
+            server = await loop.create_server(
+                lambda: _CaptureTcpProtocol(fut),
+                host,
+                port,
+            )
+
+        return await asyncio.wait_for(fut, timeout=timeout_seconds)
+    except TimeoutError:
+        return None
+    finally:
+        if transport is not None:
+            transport.close()
+        if server is not None:
+            server.close()
+            await server.wait_closed()
+
+
+class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for WIT 901 WIFI."""
+
+    VERSION = 1
+
+    def __init__(self) -> None:
+        self._pending: dict[str, Any] = {}
+        self._discovery_task: asyncio.Task[str | None] | None = None
+        self._provisioning_sent = False
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Return the options flow handler."""
+        return Wit901WifiOptionsFlow(config_entry)
+
+    async def async_step_user(self, user_input: Mapping[str, Any] | None = None):
+        """Step 1: listener config."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            validated = dict(user_input)
+            protocol = str(validated.get(CONF_PROTOCOL, DEFAULT_PROTOCOL)).lower()
+            host = str(validated.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST)).strip()
+
+            try:
+                port = int(validated.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT))
+            except (TypeError, ValueError):
+                port = -1
+
+            try:
+                timeout = int(validated.get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS))
+            except (TypeError, ValueError):
+                timeout = -1
+
+            validated[CONF_PROTOCOL] = protocol
+            validated[CONF_LISTEN_HOST] = host
+            validated[CONF_LISTEN_PORT] = port
+            validated[CONF_TIMEOUT_SECONDS] = timeout
+
+            if protocol not in {PROTOCOL_UDP, PROTOCOL_TCP}:
+                errors[CONF_PROTOCOL] = "invalid_protocol"
+            if not _is_valid_ipv4(host):
+                errors[CONF_LISTEN_HOST] = "invalid_host"
+            if not 1024 <= port <= 65535:
+                errors[CONF_LISTEN_PORT] = "invalid_port"
+            if not 3 <= timeout <= 300:
+                errors[CONF_TIMEOUT_SECONDS] = "invalid_timeout"
+
+            if (
+                not errors
+                and self._has_existing_listener_conflict(protocol=protocol, host=host, port=port)
+            ):
+                errors["base"] = "address_in_use"
+
+            if not errors:
+                can_bind = await self.hass.async_add_executor_job(
+                    _can_bind_listener,
+                    host,
+                    port,
+                    protocol,
+                )
+                if not can_bind:
+                    errors["base"] = "cannot_bind"
+
+            if not errors:
+                self._pending = validated
+                return await self.async_step_sensor_setup_menu()
+
+            user_input = validated
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_NAME, default=(user_input or {}).get(CONF_NAME, NAME)): str,
+                vol.Required(
+                    CONF_PROTOCOL,
+                    default=(user_input or {}).get(CONF_PROTOCOL, DEFAULT_PROTOCOL),
+                ): vol.In([PROTOCOL_UDP, PROTOCOL_TCP]),
+                vol.Required(
+                    CONF_LISTEN_HOST,
+                    default=(user_input or {}).get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST),
+                ): str,
+                vol.Required(
+                    CONF_LISTEN_PORT,
+                    default=(user_input or {}).get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
+                ): int,
+                vol.Required(
+                    CONF_TIMEOUT_SECONDS,
+                    default=(user_input or {}).get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS),
+                ): int,
+            }
+        )
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_sensor_setup_menu(self, user_input: Mapping[str, Any] | None = None):
+        """Step 2 menu: optional provisioning or skip directly to await_frame."""
+        return self.async_show_menu(
+            step_id="sensor_setup_menu",
+            menu_options=["sensor_setup", "await_frame"],
+        )
+
+    async def async_step_sensor_setup(self, user_input: Mapping[str, Any] | None = None):
+        """Optional sensor provisioning step using IPWIFI command."""
+        if not self._pending:
+            return self.async_abort(reason="missing_listener_config")
+
+        errors: dict[str, str] = {}
+        defaults = {
+            CONF_SENSOR_HOST: DEFAULT_SENSOR_HOST,
+            CONF_SENSOR_PORT: DEFAULT_SENSOR_PORT,
+            CONF_TARGET_IP: _guess_local_ipv4(),
+            CONF_WIFI_SSID: "",
+            CONF_WIFI_PASSWORD: "",
+        }
+        if user_input is not None:
+            data = dict(user_input)
+            sensor_host = str(data.get(CONF_SENSOR_HOST, DEFAULT_SENSOR_HOST)).strip()
+            target_ip = str(data.get(CONF_TARGET_IP, "")).strip()
+            wifi_ssid = str(data.get(CONF_WIFI_SSID, "")).strip()
+            wifi_password = str(data.get(CONF_WIFI_PASSWORD, ""))
+
+            try:
+                sensor_port = int(data.get(CONF_SENSOR_PORT, DEFAULT_SENSOR_PORT))
+            except (TypeError, ValueError):
+                sensor_port = -1
+
+            if not _is_valid_ipv4(sensor_host):
+                errors[CONF_SENSOR_HOST] = "invalid_host"
+            if not 1 <= sensor_port <= 65535:
+                errors[CONF_SENSOR_PORT] = "invalid_port"
+            if not _is_valid_ipv4(target_ip):
+                errors[CONF_TARGET_IP] = "invalid_host"
+            if not wifi_ssid:
+                errors[CONF_WIFI_SSID] = "required"
+            if not wifi_password:
+                errors[CONF_WIFI_PASSWORD] = "required"
+
+            if not errors:
+                reachable = await async_probe_sensor(sensor_host, sensor_port)
+                if not reachable:
+                    errors["base"] = "sensor_unreachable"
+
+            if not errors:
+                try:
+                    await async_send_ipwifi_command(
+                        sensor_host=sensor_host,
+                        sensor_port=sensor_port,
+                        wifi_ssid=wifi_ssid,
+                        wifi_password=wifi_password,
+                        protocol=self._pending[CONF_PROTOCOL],
+                        target_ip=target_ip,
+                        target_port=self._pending[CONF_LISTEN_PORT],
+                    )
+                except OSError:
+                    errors["base"] = "cannot_send_command"
+
+            if not errors:
+                self._provisioning_sent = True
+                return await self.async_step_await_frame()
+
+            defaults.update(data)
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_SENSOR_HOST,
+                    default=defaults[CONF_SENSOR_HOST],
+                ): str,
+                vol.Required(
+                    CONF_SENSOR_PORT,
+                    default=defaults[CONF_SENSOR_PORT],
+                ): int,
+                vol.Required(
+                    CONF_TARGET_IP,
+                    default=defaults[CONF_TARGET_IP],
+                ): str,
+                vol.Required(
+                    CONF_WIFI_SSID,
+                    default=defaults[CONF_WIFI_SSID],
+                ): str,
+                vol.Required(
+                    CONF_WIFI_PASSWORD,
+                    default=defaults[CONF_WIFI_PASSWORD],
+                ): str,
+            }
+        )
+        return self.async_show_form(step_id="sensor_setup", data_schema=schema, errors=errors)
+
+    async def async_step_await_frame(self, user_input: Mapping[str, Any] | None = None):
+        """Step 3: wait for first frame and auto-detect device_id."""
+        if not self._pending:
+            return self.async_abort(reason="missing_listener_config")
+
+        if self._discovery_task is None:
+            timeout_seconds = max(
+                DEFAULT_DISCOVERY_TIMEOUT,
+                int(self._pending.get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS)) * 3,
+            )
+            self._discovery_task = self.hass.async_create_task(
+                _await_first_device_id(
+                    protocol=self._pending[CONF_PROTOCOL],
+                    host=self._pending[CONF_LISTEN_HOST],
+                    port=self._pending[CONF_LISTEN_PORT],
+                    timeout_seconds=timeout_seconds,
+                )
+            )
+            return self.async_show_progress(
+                step_id="await_frame",
+                progress_action="waiting_for_frame",
+            )
+
+        if not self._discovery_task.done():
+            return self.async_show_progress(
+                step_id="await_frame",
+                progress_action="waiting_for_frame",
+            )
+
+        discovered = self._discovery_task.result()
+        self._discovery_task = None
+
+        if discovered:
+            return await self._create_entry(discovered)
+
+        return self.async_show_form(
+            step_id="manual_device_id",
+            data_schema=vol.Schema({vol.Required(CONF_DEVICE_ID): str}),
+            errors={"base": "frame_timeout"},
+        )
+
+    async def async_step_manual_device_id(self, user_input: Mapping[str, Any] | None = None):
+        """Fallback step when automatic discovery timed out."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            device_id = str(user_input.get(CONF_DEVICE_ID, "")).strip().upper()
+            if not _is_valid_device_id(device_id):
+                errors[CONF_DEVICE_ID] = "invalid_device_id"
+            else:
+                return await self._create_entry(device_id)
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_DEVICE_ID,
+                    default=(user_input or {}).get(CONF_DEVICE_ID, ""),
+                ): str
+            }
+        )
+        return self.async_show_form(step_id="manual_device_id", data_schema=schema, errors=errors)
+
+    async def _create_entry(self, device_id: str):
+        """Finalize config entry with resolved device_id."""
+        data = dict(self._pending)
+        data[CONF_DEVICE_ID] = device_id
+        await self.async_set_unique_id(device_id)
+        self._abort_if_unique_id_configured(updates=data)
+        title = str(data.get(CONF_NAME) or f"{NAME} {device_id}")
+        return self.async_create_entry(title=title, data=data)
+
+    def _has_existing_listener_conflict(self, protocol: str, host: str, port: int) -> bool:
+        """Return True if another configured entry already occupies the same listener space."""
+        for entry in self._async_current_entries():
+            merged = _merge_entry_config(entry)
+            entry_protocol = str(merged.get(CONF_PROTOCOL, DEFAULT_PROTOCOL)).lower()
+            entry_host = str(merged.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST))
+            entry_port = int(merged.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT))
+            if entry_protocol != protocol or entry_port != port:
+                continue
+            if _hosts_conflict(entry_host, host):
+                return True
+        return False
+
+
+class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
+    """Handle WIT 901 WIFI options flow."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input: Mapping[str, Any] | None = None):
+        """Manage the options."""
+        errors: dict[str, str] = {}
+        current = _merge_entry_config(self._config_entry)
+
+        if user_input is not None:
+            validated = dict(user_input)
+            protocol = str(
+                validated.get(
+                    CONF_PROTOCOL,
+                    current.get(CONF_PROTOCOL, DEFAULT_PROTOCOL),
+                )
+            ).lower()
+            host = str(
+                validated.get(
+                    CONF_LISTEN_HOST,
+                    current.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST),
+                )
+            ).strip()
+            device_id = str(
+                validated.get(
+                    CONF_DEVICE_ID,
+                    current.get(CONF_DEVICE_ID, ""),
+                )
+            ).strip().upper()
+
+            try:
+                port = int(
+                    validated.get(
+                        CONF_LISTEN_PORT,
+                        current.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
+                    )
+                )
+            except (TypeError, ValueError):
+                port = -1
+
+            try:
+                timeout = int(
+                    validated.get(
+                        CONF_TIMEOUT_SECONDS,
+                        current.get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS),
+                    )
+                )
+            except (TypeError, ValueError):
+                timeout = -1
+
+            validated[CONF_PROTOCOL] = protocol
+            validated[CONF_LISTEN_HOST] = host
+            validated[CONF_LISTEN_PORT] = port
+            validated[CONF_DEVICE_ID] = device_id
+            validated[CONF_TIMEOUT_SECONDS] = timeout
+
+            if protocol not in {PROTOCOL_UDP, PROTOCOL_TCP}:
+                errors[CONF_PROTOCOL] = "invalid_protocol"
+            if not _is_valid_ipv4(host):
+                errors[CONF_LISTEN_HOST] = "invalid_host"
+            if not 1024 <= port <= 65535:
+                errors[CONF_LISTEN_PORT] = "invalid_port"
+            if not _is_valid_device_id(device_id):
+                errors[CONF_DEVICE_ID] = "invalid_device_id"
+            if not 3 <= timeout <= 300:
+                errors[CONF_TIMEOUT_SECONDS] = "invalid_timeout"
+
+            if (
+                not errors
+                and self._has_existing_listener_conflict(
+                    protocol=protocol,
+                    host=host,
+                    port=port,
+                    exclude_entry_id=self._config_entry.entry_id,
+                )
+            ):
+                errors["base"] = "address_in_use"
+
+            listen_changed = (
+                protocol != str(current.get(CONF_PROTOCOL, DEFAULT_PROTOCOL)).lower()
+                or host != str(current.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST))
+                or port != int(current.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT))
+            )
+            if not errors and listen_changed:
+                can_bind = await self.hass.async_add_executor_job(
+                    _can_bind_listener,
+                    host,
+                    port,
+                    protocol,
+                )
+                if not can_bind:
+                    errors["base"] = "cannot_bind"
+
+            if not errors:
+                return self.async_create_entry(title="", data=validated)
+
+            user_input = validated
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_PROTOCOL,
+                    default=(user_input or current).get(CONF_PROTOCOL, DEFAULT_PROTOCOL),
+                ): vol.In([PROTOCOL_UDP, PROTOCOL_TCP]),
+                vol.Required(
+                    CONF_LISTEN_HOST,
+                    default=(user_input or current).get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST),
+                ): str,
+                vol.Required(
+                    CONF_LISTEN_PORT,
+                    default=(user_input or current).get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
+                ): int,
+                vol.Required(
+                    CONF_DEVICE_ID,
+                    default=(user_input or current).get(CONF_DEVICE_ID, ""),
+                ): str,
+                vol.Required(
+                    CONF_TIMEOUT_SECONDS,
+                    default=(user_input or current).get(
+                        CONF_TIMEOUT_SECONDS,
+                        DEFAULT_TIMEOUT_SECONDS,
+                    ),
+                ): int,
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+
+    def _has_existing_listener_conflict(
+        self,
+        protocol: str,
+        host: str,
+        port: int,
+        exclude_entry_id: str,
+    ) -> bool:
+        """Return True if another configured entry occupies the same listener space."""
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.entry_id == exclude_entry_id:
+                continue
+
+            merged = _merge_entry_config(entry)
+            entry_protocol = str(merged.get(CONF_PROTOCOL, DEFAULT_PROTOCOL)).lower()
+            entry_host = str(merged.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST))
+            entry_port = int(merged.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT))
+
+            if entry_protocol != protocol or entry_port != port:
+                continue
+            if _hosts_conflict(entry_host, host):
+                return True
+        return False
