@@ -7,6 +7,11 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.1.4] - 2026-03-10
+
+### Changed
+- Version bump for HACS redeploy.
+
 ## [0.1.3] - 2026-03-10
 
 ### Added
