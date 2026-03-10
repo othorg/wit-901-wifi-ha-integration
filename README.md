@@ -210,6 +210,17 @@ Linting:
 ruff check custom_components/ tests/ tools/
 ```
 
+## Maintainer Release Flow
+
+To publish updates so HACS can reliably detect new versions:
+
+1. Update version in:
+`custom_components/wit_901_wifi/manifest.json` and `custom_components/wit_901_wifi/const.py` (`VERSION`).
+2. Commit and push to `main`.
+3. Create and push a semver tag:
+`git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
+4. GitHub Actions creates a GitHub Release from the pushed tag.
+
 ## License
 
 Apache 2.0 – see [LICENSE](LICENSE)

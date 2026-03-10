@@ -7,6 +7,15 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.2.2] - 2026-03-10
+
+### Added
+- GitHub release automation workflow (`.github/workflows/release.yml`) for `v*` tags.
+
+### Changed
+- Explicit release/versioning flow aligned with the Lovelace card projects to improve HACS update detection.
+- Version bump only; no functional runtime behavior changes.
+
 ## [0.2.1] - 2026-03-10
 
 ### Fixed
