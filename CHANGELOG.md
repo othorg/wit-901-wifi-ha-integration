@@ -7,6 +7,16 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.2.3] - 2026-03-11
+
+### Added
+- Added full integration brand asset set under `custom_components/wit_901_wifi/brand/`:
+  - `icon.png`, `icon@2x.png`
+  - `dark_icon.png`, `dark_icon@2x.png`
+  - `logo.png`, `logo@2x.png`
+  - `dark_logo.png`, `dark_logo@2x.png`
+- Assets are derived from `wit-ha-lovelace-card/assets/wit-icon.svg` with dark-mode optimized variants.
+
 ## [0.2.2] - 2026-03-10
 
 ### Added

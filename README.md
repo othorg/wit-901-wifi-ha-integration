@@ -18,6 +18,7 @@ The sensor streams data via WiFi (UDP or TCP) directly to Home Assistant – no 
 - **Diagnostics** support for debugging
 - **HACS compatible**
 - **English and German** translations
+- **Brand assets** included in `custom_components/wit_901_wifi/brand/` (icon/logo + dark variants)
 
 ## Installation
 
