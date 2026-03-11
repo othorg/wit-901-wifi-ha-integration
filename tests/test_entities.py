@@ -1,11 +1,12 @@
-"""Tests for WIT 901 WIFI sensor entity descriptions."""
+"""Tests for WIT 901 WIFI sensor entity descriptions.
+
+These tests deliberately avoid importing homeassistant so they run in a
+lightweight CI environment (pytest + ruff only, no HA dependency).
+"""
 
 from __future__ import annotations
 
 import pytest
-
-from homeassistant.components.sensor import SensorStateClass
-from homeassistant.const import EntityCategory
 
 from custom_components.wit_901_wifi.sensor import SENSOR_DESCRIPTIONS
 
@@ -55,7 +56,7 @@ def test_new_sensors_disabled_by_default(key: str):
 def test_firmware_entity_category_diagnostic():
     """Firmware version must be EntityCategory.DIAGNOSTIC."""
     desc = _DESCRIPTIONS_BY_KEY["firmware_version"]
-    assert desc.entity_category == EntityCategory.DIAGNOSTIC
+    assert desc.entity_category == "diagnostic"
 
 
 def test_firmware_no_state_class():
@@ -68,7 +69,7 @@ def test_firmware_no_state_class():
 def test_measurement_sensors_have_state_class(key: str):
     """Acceleration, gyroscope, and magnetometer sensors need MEASUREMENT state class."""
     desc = _DESCRIPTIONS_BY_KEY[key]
-    assert desc.state_class == SensorStateClass.MEASUREMENT
+    assert desc.state_class == "measurement"
 
 
 @pytest.mark.parametrize("key,expected_value_key", sorted(VALUE_KEY_MAP.items()))

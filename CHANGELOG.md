@@ -14,7 +14,7 @@ All notable changes to this project are documented in this file.
 - Firmware version sensor uses `EntityCategory.DIAGNOSTIC`.
 - Entity tests (`tests/test_entities.py`) covering all new sensor descriptions.
 - English and German translations for all new entities.
-- README entities table updated with all 18 sensors and "disabled by default" note.
+- README entities table updated with all 17 sensors + 1 binary sensor and "disabled by default" note.
 
 ## [0.2.3] - 2026-03-11
 
