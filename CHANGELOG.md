@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+- No changes yet.
+
+## [0.4.1] - 2026-03-11
+
+### Added
+- Added HACS default-submission checklist for maintainers: `docs/HACS_DEFAULT_SUBMISSION.md`.
+
+### Changed
+- CI now includes:
+  - HACS validation (`hacs/action`, `category: integration`)
+  - Hassfest validation (`home-assistant/actions/hassfest`)
+
 ## [0.4.0] - 2026-03-11
 
 ### Added
