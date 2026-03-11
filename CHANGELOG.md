@@ -7,6 +7,13 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.4.2] - 2026-03-11
+
+### Changed
+- Updated GitHub Actions workflows to Node-24-ready `actions/checkout@v5`:
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/version-bump-release.yml`
+
 ## [0.4.1] - 2026-03-11
 
 ### Added
