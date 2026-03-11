@@ -217,6 +217,9 @@ pip install -r requirements_dev.txt
 pytest
 ```
 
+`requirements_dev.txt` includes `pytest-homeassistant-custom-component`, so Home Assistant
+modules are available during local and CI test runs.
+
 Linting:
 
 ```bash
