@@ -237,7 +237,6 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._pending: dict[str, Any] = {}
         self._discovery_task: asyncio.Task[str | None] | None = None
-        self._provisioning_sent = False
         self._discovered_device_id: str | None = None
 
     @staticmethod
@@ -437,7 +436,6 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 # Persist the target_ip from provisioning
                 self._pending[CONF_TARGET_IP] = target_ip
-                self._provisioning_sent = True
                 return await self.async_step_await_frame()
 
             defaults.update(data)

@@ -146,6 +146,11 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "Sensor %s offline during reboot grace period, suppressing warning",
                 self.device_id,
             )
+            # Schedule a deferred check after grace period expires
+            remaining = self._reboot_grace_until - time.monotonic()
+            async_call_later(
+                self.hass, max(1.0, remaining), self._deferred_offline_warning
+            )
         else:
             self._went_offline_at = time.monotonic()
             _LOGGER.warning(
@@ -157,6 +162,18 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._is_offline = True
         if self.data:
             self.async_set_updated_data({**self.data, "online": False})
+
+    @callback
+    def _deferred_offline_warning(self, _now: Any) -> None:
+        """Emit offline WARNING after grace period if sensor never came back."""
+        if not self._is_offline or self._went_offline_at is not None:
+            return  # came back online, or warning already emitted
+        self._went_offline_at = time.monotonic()
+        _LOGGER.warning(
+            "Sensor %s did not recover after reboot (offline since %s)",
+            self.device_id,
+            datetime.now().isoformat(timespec="seconds"),
+        )
 
     @callback
     def start_auto_reboot(self) -> None:
