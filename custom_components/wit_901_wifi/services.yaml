@@ -63,3 +63,18 @@ configure_sensor:
         number:
           min: 1024
           max: 65535
+
+reboot_sensor:
+  name: Reboot sensor
+  description: >-
+    Reboot a WT901WIFI sensor by re-sending its current network configuration.
+    The sensor reboots on any UDPIP/TCPIP command. Requires that the sensor
+    has sent at least one frame (so its IP is known) and that target_ip is
+    configured in the integration options.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: The config entry ID of the sensor to reboot.
+      required: true
+      selector:
+        text:

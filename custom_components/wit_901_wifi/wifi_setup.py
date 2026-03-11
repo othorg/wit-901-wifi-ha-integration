@@ -170,3 +170,25 @@ async def async_send_target_command(
     await _loop.run_in_executor(
         None, _send_udp_command_sync, sensor_host, sensor_port, payload
     )
+
+
+async def async_reboot_sensor(
+    sensor_host: str,
+    sensor_port: int,
+    protocol: str,
+    target_ip: str,
+    target_port: int,
+) -> None:
+    """Reboot sensor by re-sending its current target config.
+
+    The WT901WIFI reboots on any UDPIP/TCPIP config command,
+    even if the values are unchanged.
+    """
+    _LOGGER.info("Rebooting sensor at %s:%s", sensor_host, sensor_port)
+    await async_send_target_command(
+        sensor_host=sensor_host,
+        sensor_port=sensor_port,
+        protocol=protocol,
+        target_ip=target_ip,
+        target_port=target_port,
+    )

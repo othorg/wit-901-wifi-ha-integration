@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-03-11
+
+### Added
+- **Reboot button** entity (`ButtonDeviceClass.RESTART`, `EntityCategory.CONFIG`) to manually reboot the sensor from the HA UI.
+- **Reboot service** `wit_901_wifi.reboot_sensor` callable via Developer Tools with `entry_id` parameter.
+- **Auto-reboot** with configurable interval (disabled, 6h, 12h, 24h, or custom) in both config flow and options flow.
+- **Watchdog logging**: debounced WARNING on first offline transition, INFO on recovery with offline duration.
+- **Reboot grace period** (15s) suppresses false offline warnings after deliberate reboot.
+- **Source IP tracking** from incoming frames for reboot targeting.
+- **Target IP** field in config/options flow (auto-detected default) for reboot command destination.
+- `asyncio.Lock` serialization for reboot commands to prevent race conditions.
+- Service lifecycle: services are deregistered when the last config entry is unloaded.
+- Tests for reboot functionality (`test_reboot.py`) and button entity (`test_button.py`).
+- English and German translations for all new config fields and the reboot button entity.
+
 ## [0.3.0] - 2026-03-11
 
 ### Added

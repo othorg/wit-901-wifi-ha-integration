@@ -14,6 +14,7 @@ from .const import (
     CONF_LISTEN_HOST,
     CONF_LISTEN_PORT,
     CONF_PROTOCOL,
+    CONF_TARGET_IP,
     DEFAULT_LISTEN_HOST,
     DEFAULT_LISTEN_PORT,
     DEFAULT_PROTOCOL,
@@ -26,11 +27,11 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_CONFIGURE_SENSOR = "configure_sensor"
+SERVICE_REBOOT_SENSOR = "reboot_sensor"
 CONF_SENSOR_HOST = "sensor_host"
 CONF_SENSOR_PORT = "sensor_port"
 CONF_WIFI_SSID = "wifi_ssid"
 CONF_WIFI_PASSWORD = "wifi_password"
-CONF_TARGET_IP = "target_ip"
 CONF_TARGET_PORT = "target_port"
 
 
@@ -64,6 +65,17 @@ def _build_service_schema() -> Any:
     )
 
 
+def _build_reboot_schema() -> Any:
+    """Build the voluptuous schema for the reboot_sensor service."""
+    import voluptuous as vol  # noqa: PLC0415
+
+    return vol.Schema(
+        {
+            vol.Required("entry_id"): str,
+        }
+    )
+
+
 async def _async_handle_configure_sensor(call: ServiceCall) -> None:
     """Handle the configure_sensor service call."""
     from .wifi_setup import async_send_ipwifi_command  # noqa: PLC0415
@@ -92,6 +104,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=_build_service_schema(),
         )
 
+    if not hass.services.has_service(DOMAIN, SERVICE_REBOOT_SENSOR):
+
+        async def _async_handle_reboot_sensor(call: ServiceCall) -> None:
+            entry_id = call.data["entry_id"]
+            entry_data = hass.data.get(DOMAIN, {}).get(entry_id)
+            if not entry_data:
+                from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+
+                raise ServiceValidationError(f"Unknown entry: {entry_id}")
+            coordinator = entry_data["coordinator"]
+            await coordinator.async_reboot()
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_REBOOT_SENSOR,
+            _async_handle_reboot_sensor,
+            schema=_build_reboot_schema(),
+        )
+
     config = _entry_config(entry)
     coordinator = WitDataCoordinator(hass, config)
 
@@ -116,6 +147,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
+    # Start auto-reboot timer after listener is up
+    coordinator.start_auto_reboot()
+
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     except Exception:
@@ -137,6 +171,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await listener.async_stop()
         if coordinator:
             coordinator.async_shutdown()
+
+        # Deregister services when last entry is unloaded
+        if not hass.data.get(DOMAIN):
+            hass.services.async_remove(DOMAIN, SERVICE_CONFIGURE_SENSOR)
+            hass.services.async_remove(DOMAIN, SERVICE_REBOOT_SENSOR)
     return unloaded
 
 

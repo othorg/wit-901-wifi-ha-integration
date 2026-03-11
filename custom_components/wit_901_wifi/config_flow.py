@@ -16,13 +16,18 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 
 from .const import (
+    AUTO_REBOOT_PRESETS,
+    CONF_AUTO_REBOOT_CUSTOM,
+    CONF_AUTO_REBOOT_INTERVAL,
     CONF_DEVICE_ID,
     CONF_LISTEN_HOST,
     CONF_LISTEN_PORT,
     CONF_PROTOCOL,
+    CONF_TARGET_IP,
     CONF_TIMEOUT_SECONDS,
     CONF_UPDATE_INTERVAL,
     CONF_UPDATE_INTERVAL_CUSTOM,
+    DEFAULT_AUTO_REBOOT_INTERVAL,
     DEFAULT_LISTEN_HOST,
     DEFAULT_LISTEN_PORT,
     DEFAULT_PROTOCOL,
@@ -31,6 +36,7 @@ from .const import (
     DOMAIN,
     FRAME_HEADER,
     FRAME_LENGTH,
+    MIN_AUTO_REBOOT_S,
     MIN_UPDATE_INTERVAL_S,
     NAME,
     PROTOCOL_TCP,
@@ -46,7 +52,6 @@ CONF_SENSOR_HOST = "sensor_host"
 CONF_SENSOR_PORT = "sensor_port"
 CONF_WIFI_SSID = "wifi_ssid"
 CONF_WIFI_PASSWORD = "wifi_password"
-CONF_TARGET_IP = "target_ip"
 
 DEFAULT_SENSOR_HOST = "192.168.4.1"
 DEFAULT_SENSOR_PORT = 9250
@@ -56,6 +61,7 @@ MAX_DISCOVERY_TIMEOUT = 90
 WILDCARD_HOSTS = {"0.0.0.0", "::"}
 
 VALID_UPDATE_INTERVALS = list(UPDATE_INTERVAL_PRESETS.keys()) + ["custom"]
+VALID_AUTO_REBOOT_INTERVALS = list(AUTO_REBOOT_PRESETS.keys()) + ["custom"]
 
 
 def _is_valid_ipv4(host: str) -> bool:
@@ -115,6 +121,38 @@ def _compute_discovery_timeout(listener_timeout: int) -> int:
         MIN_DISCOVERY_TIMEOUT,
         min(MAX_DISCOVERY_TIMEOUT, listener_timeout * 3),
     )
+
+
+def _validate_auto_reboot(
+    validated: dict[str, Any],
+    errors: dict[str, str],
+    current: dict[str, Any] | None = None,
+) -> None:
+    """Validate and normalize auto-reboot interval fields."""
+    src = current or {}
+    reboot_interval = str(
+        validated.get(
+            CONF_AUTO_REBOOT_INTERVAL,
+            src.get(CONF_AUTO_REBOOT_INTERVAL, DEFAULT_AUTO_REBOOT_INTERVAL),
+        )
+    ).lower()
+    try:
+        reboot_custom = int(
+            validated.get(
+                CONF_AUTO_REBOOT_CUSTOM,
+                src.get(CONF_AUTO_REBOOT_CUSTOM, 0),
+            )
+        )
+    except (TypeError, ValueError):
+        reboot_custom = 0
+
+    validated[CONF_AUTO_REBOOT_INTERVAL] = reboot_interval
+    validated[CONF_AUTO_REBOOT_CUSTOM] = reboot_custom
+
+    if reboot_interval not in VALID_AUTO_REBOOT_INTERVALS:
+        errors[CONF_AUTO_REBOOT_INTERVAL] = "invalid_auto_reboot_interval"
+    elif reboot_interval == "custom" and reboot_custom < MIN_AUTO_REBOOT_S:
+        errors[CONF_AUTO_REBOOT_CUSTOM] = "invalid_auto_reboot_custom"
 
 
 class _CaptureUdpProtocol(asyncio.DatagramProtocol):
@@ -239,12 +277,15 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except (TypeError, ValueError):
                 update_custom = 0.0
 
+            target_ip = str(validated.get(CONF_TARGET_IP, "")).strip()
+
             validated[CONF_PROTOCOL] = protocol
             validated[CONF_LISTEN_HOST] = host
             validated[CONF_LISTEN_PORT] = port
             validated[CONF_TIMEOUT_SECONDS] = timeout
             validated[CONF_UPDATE_INTERVAL] = update_interval
             validated[CONF_UPDATE_INTERVAL_CUSTOM] = update_custom
+            validated[CONF_TARGET_IP] = target_ip
 
             if protocol not in {PROTOCOL_UDP, PROTOCOL_TCP}:
                 errors[CONF_PROTOCOL] = "invalid_protocol"
@@ -254,10 +295,14 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_LISTEN_PORT] = "invalid_port"
             if not 3 <= timeout <= 300:
                 errors[CONF_TIMEOUT_SECONDS] = "invalid_timeout"
+            if target_ip and not _is_valid_ipv4(target_ip):
+                errors[CONF_TARGET_IP] = "invalid_host"
             if update_interval not in VALID_UPDATE_INTERVALS:
                 errors[CONF_UPDATE_INTERVAL] = "invalid_update_interval"
             elif update_interval == "custom" and update_custom < MIN_UPDATE_INTERVAL_S:
                 errors[CONF_UPDATE_INTERVAL_CUSTOM] = "invalid_update_interval_custom"
+
+            _validate_auto_reboot(validated, errors)
 
             if (
                 not errors
@@ -281,6 +326,7 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             user_input = validated
 
+        guessed_ip = _guess_local_ipv4()
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=(user_input or {}).get(CONF_NAME, NAME)): str,
@@ -296,6 +342,10 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_LISTEN_PORT,
                     default=(user_input or {}).get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
                 ): int,
+                vol.Optional(
+                    CONF_TARGET_IP,
+                    default=(user_input or {}).get(CONF_TARGET_IP, guessed_ip),
+                ): str,
                 vol.Required(
                     CONF_TIMEOUT_SECONDS,
                     default=(user_input or {}).get(CONF_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS),
@@ -308,6 +358,16 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_UPDATE_INTERVAL_CUSTOM,
                     default=(user_input or {}).get(CONF_UPDATE_INTERVAL_CUSTOM, 0),
                 ): vol.Coerce(float),
+                vol.Required(
+                    CONF_AUTO_REBOOT_INTERVAL,
+                    default=(user_input or {}).get(
+                        CONF_AUTO_REBOOT_INTERVAL, DEFAULT_AUTO_REBOOT_INTERVAL
+                    ),
+                ): vol.In(VALID_AUTO_REBOOT_INTERVALS),
+                vol.Optional(
+                    CONF_AUTO_REBOOT_CUSTOM,
+                    default=(user_input or {}).get(CONF_AUTO_REBOOT_CUSTOM, 0),
+                ): vol.Coerce(int),
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -328,7 +388,7 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         defaults = {
             CONF_SENSOR_HOST: DEFAULT_SENSOR_HOST,
             CONF_SENSOR_PORT: DEFAULT_SENSOR_PORT,
-            CONF_TARGET_IP: _guess_local_ipv4(),
+            CONF_TARGET_IP: self._pending.get(CONF_TARGET_IP) or _guess_local_ipv4(),
             CONF_WIFI_SSID: "",
             CONF_WIFI_PASSWORD: "",
         }
@@ -375,6 +435,8 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors["base"] = "cannot_send_command"
 
             if not errors:
+                # Persist the target_ip from provisioning
+                self._pending[CONF_TARGET_IP] = target_ip
                 self._provisioning_sent = True
                 return await self.async_step_await_frame()
 
@@ -544,6 +606,12 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                     current.get(CONF_DEVICE_ID, ""),
                 )
             ).strip().upper()
+            target_ip = str(
+                validated.get(
+                    CONF_TARGET_IP,
+                    current.get(CONF_TARGET_IP, ""),
+                )
+            ).strip()
 
             try:
                 port = int(
@@ -585,6 +653,7 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
             validated[CONF_LISTEN_HOST] = host
             validated[CONF_LISTEN_PORT] = port
             validated[CONF_DEVICE_ID] = device_id
+            validated[CONF_TARGET_IP] = target_ip
             validated[CONF_TIMEOUT_SECONDS] = timeout
             validated[CONF_UPDATE_INTERVAL] = update_interval
             validated[CONF_UPDATE_INTERVAL_CUSTOM] = update_custom
@@ -597,12 +666,16 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_LISTEN_PORT] = "invalid_port"
             if not _is_valid_device_id(device_id):
                 errors[CONF_DEVICE_ID] = "invalid_device_id"
+            if target_ip and not _is_valid_ipv4(target_ip):
+                errors[CONF_TARGET_IP] = "invalid_host"
             if not 3 <= timeout <= 300:
                 errors[CONF_TIMEOUT_SECONDS] = "invalid_timeout"
             if update_interval not in VALID_UPDATE_INTERVALS:
                 errors[CONF_UPDATE_INTERVAL] = "invalid_update_interval"
             elif update_interval == "custom" and update_custom < MIN_UPDATE_INTERVAL_S:
                 errors[CONF_UPDATE_INTERVAL_CUSTOM] = "invalid_update_interval_custom"
+
+            _validate_auto_reboot(validated, errors, current)
 
             if (
                 not errors
@@ -635,6 +708,7 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
 
             user_input = validated
 
+        guessed_ip = current.get(CONF_TARGET_IP) or _guess_local_ipv4()
         schema = vol.Schema(
             {
                 vol.Required(
@@ -649,6 +723,10 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                     CONF_LISTEN_PORT,
                     default=(user_input or current).get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
                 ): int,
+                vol.Optional(
+                    CONF_TARGET_IP,
+                    default=(user_input or current).get(CONF_TARGET_IP, guessed_ip),
+                ): str,
                 vol.Required(
                     CONF_DEVICE_ID,
                     default=(user_input or current).get(CONF_DEVICE_ID, ""),
@@ -672,6 +750,18 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                         CONF_UPDATE_INTERVAL_CUSTOM, 0
                     ),
                 ): vol.Coerce(float),
+                vol.Required(
+                    CONF_AUTO_REBOOT_INTERVAL,
+                    default=(user_input or current).get(
+                        CONF_AUTO_REBOOT_INTERVAL, DEFAULT_AUTO_REBOOT_INTERVAL
+                    ),
+                ): vol.In(VALID_AUTO_REBOOT_INTERVALS),
+                vol.Optional(
+                    CONF_AUTO_REBOOT_CUSTOM,
+                    default=(user_input or current).get(
+                        CONF_AUTO_REBOOT_CUSTOM, 0
+                    ),
+                ): vol.Coerce(int),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

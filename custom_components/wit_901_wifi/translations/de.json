@@ -10,9 +10,12 @@
           "protocol": "Protokoll",
           "listen_host": "Listen-Host",
           "listen_port": "Listen-Port",
+          "target_ip": "Ziel-IP (Home Assistant)",
           "timeout_seconds": "Timeout (Sekunden)",
           "update_interval": "Aktualisierungsintervall",
-          "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)"
+          "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)",
+          "auto_reboot_interval": "Automatisches Neustart-Intervall",
+          "auto_reboot_custom": "Benutzerdefiniertes Neustart-Intervall (Sekunden)"
         }
       },
       "sensor_setup_menu": {
@@ -47,12 +50,14 @@
     },
     "error": {
       "invalid_protocol": "Ungültiges Protokoll",
-      "invalid_host": "Ungültiger Listen-Host (IPv4 erforderlich)",
-      "invalid_port": "Ungültiger Listen-Port (1024-65535)",
+      "invalid_host": "Ungültige IP-Adresse (IPv4 erforderlich)",
+      "invalid_port": "Ungültiger Port (1024-65535)",
       "invalid_device_id": "Device-ID muss WT55######## entsprechen",
       "invalid_timeout": "Timeout muss zwischen 3 und 300 Sekunden liegen",
       "invalid_update_interval": "Ungültiges Aktualisierungsintervall",
       "invalid_update_interval_custom": "Benutzerdefiniertes Intervall muss mindestens 0,2 Sekunden betragen",
+      "invalid_auto_reboot_interval": "Ungültiges Neustart-Intervall",
+      "invalid_auto_reboot_custom": "Benutzerdefiniertes Neustart-Intervall muss mindestens 3600 Sekunden (1 Stunde) betragen",
       "address_in_use": "Listener kollidiert mit einem bereits konfigurierten Eintrag",
       "cannot_bind": "Listener-Socket kann auf dieser Adresse nicht gebunden werden",
       "sensor_unreachable": "Sensor-Host ist von Home Assistant nicht erreichbar",
@@ -73,10 +78,13 @@
           "protocol": "Protokoll",
           "listen_host": "Listen-Host",
           "listen_port": "Listen-Port",
+          "target_ip": "Ziel-IP (Home Assistant)",
           "device_id": "Device-ID (WT55 + 8 Ziffern)",
           "timeout_seconds": "Timeout (Sekunden)",
           "update_interval": "Aktualisierungsintervall",
-          "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)"
+          "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)",
+          "auto_reboot_interval": "Automatisches Neustart-Intervall",
+          "auto_reboot_custom": "Benutzerdefiniertes Neustart-Intervall (Sekunden)"
         }
       }
     }
@@ -103,6 +111,9 @@
     },
     "binary_sensor": {
       "online": { "name": "Online" }
+    },
+    "button": {
+      "reboot": { "name": "Sensor neustarten" }
     }
   }
 }

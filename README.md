@@ -19,6 +19,9 @@ The sensor streams data via WiFi (UDP or TCP) directly to Home Assistant – no 
 - **HACS compatible**
 - **English and German** translations
 - **Brand assets** included in `custom_components/wit_901_wifi/brand/` (icon/logo + dark variants)
+- **Reboot button** to manually restart the sensor from the HA UI
+- **Auto-reboot** with configurable interval (6h, 12h, 24h, or custom)
+- **Watchdog logging** with offline/online transition notifications
 
 ## Installation
 
@@ -143,6 +146,33 @@ data:
 
 > **Security**: The WiFi password is used exclusively for the UDP command payload and is never stored or logged.
 
+## Reboot & Auto-Reboot
+
+The WT901WIFI sensor can drop off the network overnight. This integration provides several mechanisms to recover:
+
+### Reboot Button
+Each sensor device has a **Reboot** button entity. Press it in the HA UI to immediately restart the sensor with its current configuration.
+
+### Auto-Reboot
+Configure a periodic reboot interval in the config or options flow:
+- **Disabled** (default), **6h**, **12h**, **24h**, or a **custom** interval (minimum 1 hour)
+
+### Watchdog Logging
+The coordinator logs offline/online transitions:
+- **WARNING** when the sensor stops sending frames (logged once per offline event)
+- **INFO** when the sensor comes back online, including the offline duration
+
+A 15-second grace period after a deliberate reboot suppresses false offline warnings.
+
+### Reboot Service
+The `wit_901_wifi.reboot_sensor` service can be called from automations:
+
+```yaml
+service: wit_901_wifi.reboot_sensor
+data:
+  entry_id: "your_config_entry_id"
+```
+
 ## Entities
 
 After successful setup, the following entities are created:
@@ -167,6 +197,7 @@ After successful setup, the following entities are created:
 | Magnetometer Z | Sensor | µT | Magnetic field Z-axis * |
 | Firmware version | Sensor | – | Firmware register (diagnostic) * |
 | Online | Binary Sensor | – | Connection status |
+| Reboot | Button | – | Restart the sensor (config category) |
 
 > **\*** Entities marked with * are **disabled by default**. To enable them, go to the device page in HA, click the entity, and toggle "Enabled" on. This keeps the default entity list clean for users who only need the primary orientation sensors.
 

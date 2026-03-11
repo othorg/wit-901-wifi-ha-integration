@@ -14,6 +14,7 @@ def test_udp_processes_valid_frame(fixtures_dir: Path) -> None:
     proto.datagram_received(frame, ("192.168.1.100", 12345))
     assert len(frames) == 1
     assert frames[0]["device_id"] == EXPECTED_DEVICE_ID
+    assert frames[0]["source_ip"] == "192.168.1.100"
 
 
 def test_udp_ignores_wrong_device(fixtures_dir: Path) -> None:
@@ -35,9 +36,19 @@ def test_tcp_processes_complete_frame(fixtures_dir: Path) -> None:
     frames: list[dict] = []
     proto = WitTcpProtocol(EXPECTED_DEVICE_ID, frames.append)
     frame = (fixtures_dir / "frame_valid.bin").read_bytes()
+
+    # Simulate connection_made with peername
+    class FakeTransport:
+        def get_extra_info(self, key):
+            if key == "peername":
+                return ("192.168.1.200", 54321)
+            return None
+
+    proto.connection_made(FakeTransport())
     proto.data_received(frame)
     assert len(frames) == 1
     assert frames[0]["device_id"] == EXPECTED_DEVICE_ID
+    assert frames[0]["source_ip"] == "192.168.1.200"
 
 
 def test_tcp_handles_split_frame(fixtures_dir: Path) -> None:

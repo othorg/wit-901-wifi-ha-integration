@@ -10,9 +10,12 @@
           "protocol": "Protocol",
           "listen_host": "Listen host",
           "listen_port": "Listen port",
+          "target_ip": "Target IP (Home Assistant)",
           "timeout_seconds": "Timeout (seconds)",
           "update_interval": "Update interval",
-          "update_interval_custom": "Custom interval (seconds)"
+          "update_interval_custom": "Custom interval (seconds)",
+          "auto_reboot_interval": "Auto-reboot interval",
+          "auto_reboot_custom": "Custom reboot interval (seconds)"
         }
       },
       "sensor_setup_menu": {
@@ -47,12 +50,14 @@
     },
     "error": {
       "invalid_protocol": "Invalid protocol",
-      "invalid_host": "Invalid listen host (IPv4 required)",
-      "invalid_port": "Invalid listen port (1024-65535)",
+      "invalid_host": "Invalid IP address (IPv4 required)",
+      "invalid_port": "Invalid port (1024-65535)",
       "invalid_device_id": "Device ID must match WT55########",
       "invalid_timeout": "Timeout must be between 3 and 300 seconds",
       "invalid_update_interval": "Invalid update interval",
       "invalid_update_interval_custom": "Custom interval must be at least 0.2 seconds",
+      "invalid_auto_reboot_interval": "Invalid auto-reboot interval",
+      "invalid_auto_reboot_custom": "Custom reboot interval must be at least 3600 seconds (1 hour)",
       "address_in_use": "Listener conflicts with an already configured entry",
       "cannot_bind": "Cannot bind listener socket to this address",
       "sensor_unreachable": "Sensor host is not reachable from Home Assistant",
@@ -73,10 +78,13 @@
           "protocol": "Protocol",
           "listen_host": "Listen host",
           "listen_port": "Listen port",
+          "target_ip": "Target IP (Home Assistant)",
           "device_id": "Device ID (WT55 + 8 digits)",
           "timeout_seconds": "Timeout (seconds)",
           "update_interval": "Update interval",
-          "update_interval_custom": "Custom interval (seconds)"
+          "update_interval_custom": "Custom interval (seconds)",
+          "auto_reboot_interval": "Auto-reboot interval",
+          "auto_reboot_custom": "Custom reboot interval (seconds)"
         }
       }
     }
@@ -103,6 +111,9 @@
     },
     "binary_sensor": {
       "online": { "name": "Online" }
+    },
+    "button": {
+      "reboot": { "name": "Reboot sensor" }
     }
   }
 }

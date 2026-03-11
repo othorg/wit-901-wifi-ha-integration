@@ -34,6 +34,7 @@ class WitUdpProtocol(asyncio.DatagramProtocol):
                 self._device_id,
             )
             return
+        parsed["source_ip"] = addr[0]
         self._on_frame(parsed)
 
     def error_received(self, exc: Exception) -> None:
@@ -49,6 +50,12 @@ class WitTcpProtocol(asyncio.Protocol):
         self._device_id = device_id
         self._on_frame = on_frame
         self._buffer = bytearray()
+        self._peer_ip: str | None = None
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        peername = transport.get_extra_info("peername")
+        if peername:
+            self._peer_ip = peername[0]
 
     def data_received(self, data: bytes) -> None:
         self._buffer.extend(data)
@@ -72,6 +79,8 @@ class WitTcpProtocol(asyncio.Protocol):
             if parsed["device_id"] != self._device_id:
                 _LOGGER.debug("Ignoring frame from %s", parsed["device_id"])
                 continue
+            if self._peer_ip:
+                parsed["source_ip"] = self._peer_ip
             self._on_frame(parsed)
 
     def connection_lost(self, exc: Exception | None) -> None:
