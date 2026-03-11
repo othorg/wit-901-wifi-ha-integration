@@ -156,7 +156,19 @@ After successful setup, the following entities are created:
 | Battery voltage | Sensor | V | Battery level in volts |
 | Battery percentage | Sensor | % | Estimated charge level |
 | Signal strength | Sensor | dBm | WiFi RSSI |
+| Acceleration X | Sensor | g | Linear acceleration X-axis * |
+| Acceleration Y | Sensor | g | Linear acceleration Y-axis * |
+| Acceleration Z | Sensor | g | Linear acceleration Z-axis * |
+| Gyroscope X | Sensor | °/s | Angular velocity X-axis * |
+| Gyroscope Y | Sensor | °/s | Angular velocity Y-axis * |
+| Gyroscope Z | Sensor | °/s | Angular velocity Z-axis * |
+| Magnetometer X | Sensor | µT | Magnetic field X-axis * |
+| Magnetometer Y | Sensor | µT | Magnetic field Y-axis * |
+| Magnetometer Z | Sensor | µT | Magnetic field Z-axis * |
+| Firmware version | Sensor | – | Firmware register (diagnostic) * |
 | Online | Binary Sensor | – | Connection status |
+
+> **\*** Entities marked with * are **disabled by default**. To enable them, go to the device page in HA, click the entity, and toggle "Enabled" on. This keeps the default entity list clean for users who only need the primary orientation sensors.
 
 ## Architecture
 

@@ -89,7 +89,17 @@
       "temperature": { "name": "Temperature" },
       "battery_voltage": { "name": "Battery voltage" },
       "battery_percentage": { "name": "Battery" },
-      "rssi": { "name": "Signal strength" }
+      "rssi": { "name": "Signal strength" },
+      "acc_x": { "name": "Acceleration X" },
+      "acc_y": { "name": "Acceleration Y" },
+      "acc_z": { "name": "Acceleration Z" },
+      "gyro_x": { "name": "Gyroscope X" },
+      "gyro_y": { "name": "Gyroscope Y" },
+      "gyro_z": { "name": "Gyroscope Z" },
+      "mag_x": { "name": "Magnetometer X" },
+      "mag_y": { "name": "Magnetometer Y" },
+      "mag_z": { "name": "Magnetometer Z" },
+      "firmware_version": { "name": "Firmware version" }
     },
     "binary_sensor": {
       "online": { "name": "Online" }

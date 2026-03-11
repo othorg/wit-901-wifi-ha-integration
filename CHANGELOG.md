@@ -2,10 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-03-11
 
 ### Added
-- No changes yet.
+- 10 new sensor entities exposing all available WT901WIFI data:
+  - Acceleration X/Y/Z (g)
+  - Gyroscope X/Y/Z (°/s)
+  - Magnetometer X/Y/Z (µT)
+  - Firmware version (diagnostic)
+- All new sensors are **disabled by default** (`entity_registry_enabled_default=False`) to keep the default entity list clean.
+- Firmware version sensor uses `EntityCategory.DIAGNOSTIC`.
+- Entity tests (`tests/test_entities.py`) covering all new sensor descriptions.
+- English and German translations for all new entities.
+- README entities table updated with all 18 sensors and "disabled by default" note.
 
 ## [0.2.3] - 2026-03-11
 

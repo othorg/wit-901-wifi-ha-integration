@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     DEGREE,
+    EntityCategory,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     UnitOfElectricPotential,
@@ -25,6 +26,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import WitDataCoordinator
+
+# Units not available as HA constants
+UNIT_G = "g"
+UNIT_DPS = "°/s"
+UNIT_MICROTESLA = "µT"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -92,6 +98,98 @@ SENSOR_DESCRIPTIONS: tuple[WitSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # --- Acceleration (disabled by default) ---
+    WitSensorEntityDescription(
+        key="acc_x",
+        translation_key="acc_x",
+        value_key="acc_x_g",
+        native_unit_of_measurement=UNIT_G,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    WitSensorEntityDescription(
+        key="acc_y",
+        translation_key="acc_y",
+        value_key="acc_y_g",
+        native_unit_of_measurement=UNIT_G,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    WitSensorEntityDescription(
+        key="acc_z",
+        translation_key="acc_z",
+        value_key="acc_z_g",
+        native_unit_of_measurement=UNIT_G,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    # --- Gyroscope (disabled by default) ---
+    WitSensorEntityDescription(
+        key="gyro_x",
+        translation_key="gyro_x",
+        value_key="gyro_x_dps",
+        native_unit_of_measurement=UNIT_DPS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    WitSensorEntityDescription(
+        key="gyro_y",
+        translation_key="gyro_y",
+        value_key="gyro_y_dps",
+        native_unit_of_measurement=UNIT_DPS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    WitSensorEntityDescription(
+        key="gyro_z",
+        translation_key="gyro_z",
+        value_key="gyro_z_dps",
+        native_unit_of_measurement=UNIT_DPS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    # --- Magnetometer (disabled by default) ---
+    WitSensorEntityDescription(
+        key="mag_x",
+        translation_key="mag_x",
+        value_key="mag_x_ut",
+        native_unit_of_measurement=UNIT_MICROTESLA,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    WitSensorEntityDescription(
+        key="mag_y",
+        translation_key="mag_y",
+        value_key="mag_y_ut",
+        native_unit_of_measurement=UNIT_MICROTESLA,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    WitSensorEntityDescription(
+        key="mag_z",
+        translation_key="mag_z",
+        value_key="mag_z_ut",
+        native_unit_of_measurement=UNIT_MICROTESLA,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=3,
+        entity_registry_enabled_default=False,
+    ),
+    # --- Firmware version (diagnostic, disabled by default) ---
+    WitSensorEntityDescription(
+        key="firmware_version",
+        translation_key="firmware_version",
+        value_key="version",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
 )
 
