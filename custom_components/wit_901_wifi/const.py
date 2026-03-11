@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "wit_901_wifi"
 NAME = "WIT 901 WIFI"
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 
 PLATFORMS: tuple[str, ...] = ("sensor", "binary_sensor", "button")
 

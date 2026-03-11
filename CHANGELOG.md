@@ -7,6 +7,22 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.4.3] - 2026-03-11
+
+### Fixed
+- Config flow frame discovery is now robust against real-world UDP payloads:
+  - discovery now binds UDP with `SO_REUSEADDR` (same bind behavior as runtime listener)
+  - payload scanning now supports prefixed/concatenated frame data and extracts the first valid WT frame
+- This resolves cases where CLI discovery succeeded but HA config-flow `await_frame` timed out.
+
+### Added
+- New regression tests for config-flow discovery payload extraction:
+  - exact frame payload
+  - prefixed payload
+  - multi-frame payload
+  - invalid payload fallback
+- Restored top-level `requirements.txt` for reproducible local HA test environment setup.
+
 ## [0.4.2] - 2026-03-11
 
 ### Changed

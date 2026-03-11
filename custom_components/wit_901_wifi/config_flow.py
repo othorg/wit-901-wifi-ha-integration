@@ -162,9 +162,37 @@ class _CaptureUdpProtocol(asyncio.DatagramProtocol):
         self._future = fut
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        parsed = parse_streaming_frame(data)
-        if parsed and not self._future.done():
-            self._future.set_result(parsed["device_id"])
+        device_id = _extract_device_id_from_payload(data)
+        if device_id and not self._future.done():
+            self._future.set_result(device_id)
+
+
+def _extract_device_id_from_payload(payload: bytes) -> str | None:
+    """Extract first valid device_id from raw UDP/TCP payload bytes.
+
+    Handles:
+    - exact one-frame payloads (54 bytes)
+    - prefixed payloads (garbage before frame header)
+    - payloads with multiple concatenated frames
+    """
+    if len(payload) < FRAME_LENGTH:
+        return None
+
+    if len(payload) == FRAME_LENGTH:
+        parsed = parse_streaming_frame(payload)
+        return parsed["device_id"] if parsed else None
+
+    start = 0
+    while True:
+        idx = payload.find(FRAME_HEADER, start)
+        if idx < 0:
+            return None
+        end = idx + FRAME_LENGTH
+        if end <= len(payload):
+            parsed = parse_streaming_frame(payload[idx:end])
+            if parsed:
+                return parsed["device_id"]
+        start = idx + 1
 
 
 class _CaptureTcpProtocol(asyncio.Protocol):
@@ -207,9 +235,13 @@ async def _await_first_device_id(
     server: asyncio.AbstractServer | None = None
     try:
         if protocol == PROTOCOL_UDP:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setblocking(False)
+            sock.bind((host, port))
             transport, _ = await loop.create_datagram_endpoint(
                 lambda: _CaptureUdpProtocol(fut),
-                local_addr=(host, port),
+                sock=sock,
             )
         else:
             server = await loop.create_server(
