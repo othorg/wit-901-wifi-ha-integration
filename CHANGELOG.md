@@ -7,6 +7,14 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.5.2] - 2026-03-13
+
+### Changed
+- Reworked Options Flow to a menu-based structure:
+  - `Listener & device settings` (protocol/host/port/device_id/timeout/update interval/auto-reboot)
+  - `MQTT forwarding` (enable/prefix/sensors/interval/qos)
+- Each options path now saves independently and merges with existing configuration, so MQTT or listener settings can be changed without re-entering the other section.
+
 ## [0.5.1] - 2026-03-13
 
 ### Changed

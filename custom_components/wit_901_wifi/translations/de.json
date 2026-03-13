@@ -77,6 +77,14 @@
     "step": {
       "init": {
         "title": "WIT 901 WIFI Optionen",
+        "description": "Einstellungen auswählen.",
+        "menu_options": {
+          "listener": "Listener- & Geräteeinstellungen",
+          "mqtt": "MQTT-Weiterleitung"
+        }
+      },
+      "listener": {
+        "title": "Listener- & Geräteeinstellungen",
         "description": "Aktualisiere Listener- und Geräteoptionen.",
         "data": {
           "protocol": "Protokoll",

@@ -77,6 +77,14 @@
     "step": {
       "init": {
         "title": "WIT 901 WIFI options",
+        "description": "Choose which settings to configure.",
+        "menu_options": {
+          "listener": "Listener & device settings",
+          "mqtt": "MQTT forwarding"
+        }
+      },
+      "listener": {
+        "title": "Listener & device settings",
         "description": "Update listener and device options.",
         "data": {
           "protocol": "Protocol",

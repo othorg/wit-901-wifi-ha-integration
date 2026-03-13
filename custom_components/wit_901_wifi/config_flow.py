@@ -628,10 +628,16 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
-        self._options_data: dict[str, Any] = {}
 
     async def async_step_init(self, user_input: Mapping[str, Any] | None = None):
-        """Manage the options."""
+        """Show menu to choose between listener and MQTT settings."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["listener", "mqtt"],
+        )
+
+    async def async_step_listener(self, user_input: Mapping[str, Any] | None = None):
+        """Manage listener and device options."""
         errors: dict[str, str] = {}
         current = _merge_entry_config(self._config_entry)
 
@@ -753,8 +759,10 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                     errors["base"] = "cannot_bind"
 
             if not errors:
-                self._options_data = validated
-                return await self.async_step_mqtt()
+                # Merge with existing options to preserve MQTT settings
+                merged = dict(current)
+                merged.update(validated)
+                return self.async_create_entry(title="", data=merged)
 
             user_input = validated
 
@@ -814,12 +822,12 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                 ): vol.Coerce(int),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        return self.async_show_form(step_id="listener", data_schema=schema, errors=errors)
 
     async def async_step_mqtt(
         self, user_input: Mapping[str, Any] | None = None,
     ):
-        """Step 2: MQTT forwarding configuration."""
+        """Manage MQTT forwarding options."""
         errors: dict[str, str] = {}
         current = _merge_entry_config(self._config_entry)
 
@@ -864,7 +872,9 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_MQTT_INTERVAL_CUSTOM] = "invalid_mqtt_interval_custom"
 
             if not errors:
-                self._options_data.update({
+                # Merge with existing options to preserve listener settings
+                merged = dict(current)
+                merged.update({
                     CONF_MQTT_ENABLED: mqtt_enabled,
                     CONF_MQTT_TOPIC_PREFIX: prefix,
                     CONF_MQTT_SENSORS: user_input.get(CONF_MQTT_SENSORS, []),
@@ -872,7 +882,7 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                     CONF_MQTT_INTERVAL_CUSTOM: mqtt_interval_custom,
                     CONF_MQTT_QOS: qos,
                 })
-                return self.async_create_entry(title="", data=self._options_data)
+                return self.async_create_entry(title="", data=merged)
 
         # On validation error, re-use user_input as defaults so nothing is lost
         defaults = user_input if user_input is not None else current
