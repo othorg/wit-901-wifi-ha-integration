@@ -338,6 +338,20 @@ To publish updates so HACS can reliably detect new versions:
 `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
 4. GitHub Actions creates a GitHub Release from the pushed tag.
 
+This release flow intentionally uses explicit manual tags (same pattern as the RV Level Lovelace Card repository).
+
+## Branding Assets
+
+- Integration-local brand assets:
+  - `custom_components/wit_901_wifi/brand/icon*.png`
+  - `custom_components/wit_901_wifi/brand/dark_icon*.png`
+  - `custom_components/wit_901_wifi/brand/logo*.png`
+  - `custom_components/wit_901_wifi/brand/dark_logo*.png`
+- Repository-level fallback assets for HACS/UI rendering:
+  - `hacs.png`
+  - `icon.png`
+  - `brand/` (same icon/logo variants)
+
 ## License
 
 Apache 2.0 – see [LICENSE](LICENSE)

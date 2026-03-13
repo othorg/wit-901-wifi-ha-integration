@@ -7,6 +7,19 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.5.1] - 2026-03-13
+
+### Changed
+- Aligned release flow with the RV Level Lovelace Card workflow:
+  - removed automatic tag creation workflow
+  - keep explicit manual version bump + commit + tag
+
+### Added
+- Added repository-level branding assets for HACS/UI rendering fallback:
+  - `hacs.png`
+  - `icon.png`
+  - `brand/icon*.png`, `brand/dark_icon*.png`, `brand/logo*.png`, `brand/dark_logo*.png`
+
 ## [0.5.0] - 2026-03-13
 
 ### Added
