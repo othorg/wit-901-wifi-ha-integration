@@ -15,6 +15,8 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 
+import homeassistant.helpers.config_validation as cv
+
 from .const import (
     AUTO_REBOOT_PRESETS,
     CONF_AUTO_REBOOT_CUSTOM,
@@ -22,6 +24,12 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_LISTEN_HOST,
     CONF_LISTEN_PORT,
+    CONF_MQTT_ENABLED,
+    CONF_MQTT_INTERVAL,
+    CONF_MQTT_INTERVAL_CUSTOM,
+    CONF_MQTT_QOS,
+    CONF_MQTT_SENSORS,
+    CONF_MQTT_TOPIC_PREFIX,
     CONF_PROTOCOL,
     CONF_TARGET_IP,
     CONF_TIMEOUT_SECONDS,
@@ -30,6 +38,10 @@ from .const import (
     DEFAULT_AUTO_REBOOT_INTERVAL,
     DEFAULT_LISTEN_HOST,
     DEFAULT_LISTEN_PORT,
+    DEFAULT_MQTT_ENABLED,
+    DEFAULT_MQTT_INTERVAL,
+    DEFAULT_MQTT_QOS,
+    DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_PROTOCOL,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_UPDATE_INTERVAL,
@@ -37,7 +49,10 @@ from .const import (
     FRAME_HEADER,
     FRAME_LENGTH,
     MIN_AUTO_REBOOT_S,
+    MIN_MQTT_INTERVAL_S,
     MIN_UPDATE_INTERVAL_S,
+    MQTT_FORWARDABLE_SENSORS,
+    MQTT_INTERVAL_PRESETS,
     NAME,
     PROTOCOL_TCP,
     PROTOCOL_UDP,
@@ -605,11 +620,15 @@ class Wit901WifiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return False
 
 
+VALID_MQTT_INTERVALS = list(MQTT_INTERVAL_PRESETS.keys()) + ["custom"]
+
+
 class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
     """Handle WIT 901 WIFI options flow."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
+        self._options_data: dict[str, Any] = {}
 
     async def async_step_init(self, user_input: Mapping[str, Any] | None = None):
         """Manage the options."""
@@ -734,7 +753,8 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
                     errors["base"] = "cannot_bind"
 
             if not errors:
-                return self.async_create_entry(title="", data=validated)
+                self._options_data = validated
+                return await self.async_step_mqtt()
 
             user_input = validated
 
@@ -795,6 +815,96 @@ class Wit901WifiOptionsFlow(config_entries.OptionsFlow):
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+
+    async def async_step_mqtt(
+        self, user_input: Mapping[str, Any] | None = None,
+    ):
+        """Step 2: MQTT forwarding configuration."""
+        errors: dict[str, str] = {}
+        current = _merge_entry_config(self._config_entry)
+
+        if user_input is not None:
+            mqtt_enabled = user_input.get(CONF_MQTT_ENABLED, False)
+
+            # Validate MQTT integration is loaded
+            if mqtt_enabled and "mqtt" not in self.hass.config.components:
+                errors["base"] = "mqtt_not_configured"
+
+            # Validate topic prefix
+            prefix = str(
+                user_input.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX)
+            ).strip().strip("/")
+            if mqtt_enabled and (not prefix or "#" in prefix or "+" in prefix or "//" in prefix):
+                errors[CONF_MQTT_TOPIC_PREFIX] = "invalid_mqtt_topic"
+
+            # QoS: explicitly cast to int (UI may deliver string)
+            try:
+                qos = int(user_input.get(CONF_MQTT_QOS, DEFAULT_MQTT_QOS))
+            except (TypeError, ValueError):
+                qos = DEFAULT_MQTT_QOS
+
+            # Validate MQTT interval
+            mqtt_interval = str(
+                user_input.get(CONF_MQTT_INTERVAL, DEFAULT_MQTT_INTERVAL)
+            ).lower()
+            try:
+                mqtt_interval_custom = float(
+                    user_input.get(CONF_MQTT_INTERVAL_CUSTOM, 0)
+                )
+            except (TypeError, ValueError):
+                mqtt_interval_custom = 0.0
+
+            if mqtt_enabled and mqtt_interval not in VALID_MQTT_INTERVALS:
+                errors[CONF_MQTT_INTERVAL] = "invalid_mqtt_interval"
+            elif (
+                mqtt_enabled
+                and mqtt_interval == "custom"
+                and mqtt_interval_custom < MIN_MQTT_INTERVAL_S
+            ):
+                errors[CONF_MQTT_INTERVAL_CUSTOM] = "invalid_mqtt_interval_custom"
+
+            if not errors:
+                self._options_data.update({
+                    CONF_MQTT_ENABLED: mqtt_enabled,
+                    CONF_MQTT_TOPIC_PREFIX: prefix,
+                    CONF_MQTT_SENSORS: user_input.get(CONF_MQTT_SENSORS, []),
+                    CONF_MQTT_INTERVAL: mqtt_interval,
+                    CONF_MQTT_INTERVAL_CUSTOM: mqtt_interval_custom,
+                    CONF_MQTT_QOS: qos,
+                })
+                return self.async_create_entry(title="", data=self._options_data)
+
+        # On validation error, re-use user_input as defaults so nothing is lost
+        defaults = user_input if user_input is not None else current
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_MQTT_ENABLED,
+                    default=defaults.get(CONF_MQTT_ENABLED, DEFAULT_MQTT_ENABLED),
+                ): bool,
+                vol.Optional(
+                    CONF_MQTT_TOPIC_PREFIX,
+                    default=defaults.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+                ): str,
+                vol.Optional(
+                    CONF_MQTT_SENSORS,
+                    default=defaults.get(CONF_MQTT_SENSORS, []),
+                ): cv.multi_select(MQTT_FORWARDABLE_SENSORS),
+                vol.Optional(
+                    CONF_MQTT_INTERVAL,
+                    default=defaults.get(CONF_MQTT_INTERVAL, DEFAULT_MQTT_INTERVAL),
+                ): vol.In(VALID_MQTT_INTERVALS),
+                vol.Optional(
+                    CONF_MQTT_INTERVAL_CUSTOM,
+                    default=defaults.get(CONF_MQTT_INTERVAL_CUSTOM, 0),
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_MQTT_QOS,
+                    default=defaults.get(CONF_MQTT_QOS, DEFAULT_MQTT_QOS),
+                ): vol.In({0: "0", 1: "1", 2: "2"}),
+            }
+        )
+        return self.async_show_form(step_id="mqtt", data_schema=schema, errors=errors)
 
     def _has_existing_listener_conflict(
         self,

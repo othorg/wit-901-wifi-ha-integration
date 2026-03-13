@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "wit_901_wifi"
 NAME = "WIT 901 WIFI"
-VERSION = "0.4.3"
+VERSION = "0.5.0"
 
 PLATFORMS: tuple[str, ...] = ("sensor", "binary_sensor", "button")
 
@@ -56,6 +56,55 @@ VALID_PROTOCOLS = {PROTOCOL_UDP, PROTOCOL_TCP}
 FRAME_LENGTH = 54
 FRAME_HEADER = b"WT55"
 FRAME_FOOTER = b"\r\n"
+
+# MQTT forwarding configuration
+CONF_MQTT_ENABLED = "mqtt_enabled"
+CONF_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix"
+CONF_MQTT_SENSORS = "mqtt_sensors"
+CONF_MQTT_QOS = "mqtt_qos"
+CONF_MQTT_INTERVAL = "mqtt_interval"
+CONF_MQTT_INTERVAL_CUSTOM = "mqtt_interval_custom"
+
+DEFAULT_MQTT_ENABLED = False
+DEFAULT_MQTT_TOPIC_PREFIX = "wit901"
+DEFAULT_MQTT_QOS = 0
+DEFAULT_MQTT_INTERVAL = "live"
+MIN_MQTT_INTERVAL_S = 0.2
+
+MQTT_INTERVAL_PRESETS: dict[str, float] = {
+    "live": 0,
+    "1s": 1.0,
+    "5s": 5.0,
+    "10s": 10.0,
+    "30s": 30.0,
+    "1min": 60.0,
+    "5min": 300.0,
+    "15min": 900.0,
+    "1h": 3600.0,
+    "6h": 21600.0,
+    "12h": 43200.0,
+    "24h": 86400.0,
+}
+
+# Forwardable sensor value_keys (from protocol parser) → human label
+MQTT_FORWARDABLE_SENSORS: dict[str, str] = {
+    "roll_deg": "Roll (°)",
+    "pitch_deg": "Pitch (°)",
+    "yaw_deg": "Yaw (°)",
+    "temperature_c": "Temperature (°C)",
+    "battery_voltage_v": "Battery voltage (V)",
+    "battery_percentage": "Battery (%)",
+    "rssi_dbm": "Signal strength (dBm)",
+    "acc_x_g": "Acceleration X (g)",
+    "acc_y_g": "Acceleration Y (g)",
+    "acc_z_g": "Acceleration Z (g)",
+    "gyro_x_dps": "Gyroscope X (°/s)",
+    "gyro_y_dps": "Gyroscope Y (°/s)",
+    "gyro_z_dps": "Gyroscope Z (°/s)",
+    "mag_x_ut": "Magnetometer X (µT)",
+    "mag_y_ut": "Magnetometer Y (µT)",
+    "mag_z_ut": "Magnetometer Z (µT)",
+}
 
 BATTERY_THRESHOLDS: tuple[tuple[int, int], ...] = (
     (393, 90),

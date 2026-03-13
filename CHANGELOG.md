@@ -7,6 +7,18 @@ All notable changes to this project are documented in this file.
 ### Added
 - No changes yet.
 
+## [0.5.0] - 2026-03-13
+
+### Added
+- Optional MQTT forwarding for sensor values and availability (`online`/`offline`).
+- MQTT configuration in Options Flow as a dedicated second step (`init` → `mqtt`).
+- New MQTT interval presets and custom interval support.
+- New MQTT test suite (`tests/test_mqtt.py`) covering interval resolution, publish behavior, and constants.
+
+### Fixed
+- Availability publish now also works when MQTT is enabled with an empty selected-sensor list.
+- MQTT options form now preserves user input on validation errors.
+
 ## [0.4.3] - 2026-03-11
 
 ### Fixed

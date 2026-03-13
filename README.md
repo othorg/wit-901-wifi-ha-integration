@@ -22,6 +22,7 @@ The sensor streams data via WiFi (UDP or TCP) directly to Home Assistant – no 
 - **Reboot button** to manually restart the sensor from the HA UI
 - **Auto-reboot** with configurable interval (6h, 12h, 24h, or custom)
 - **Watchdog logging** with offline/online transition notifications
+- **MQTT forwarding** – publish selected sensor values to an MQTT broker for cross-instance sharing
 
 ## Installation
 
@@ -173,6 +174,73 @@ data:
   entry_id: "your_config_entry_id"
 ```
 
+## MQTT Forwarding
+
+Forward selected sensor values to an MQTT broker — useful for sharing sensor data with a second Home Assistant instance or any MQTT-capable system.
+
+### Prerequisites
+
+- The **MQTT integration** must be configured in Home Assistant before enabling MQTT forwarding.
+
+### Configuration
+
+MQTT forwarding is configured in the **Options Flow** (Settings → Devices & Services → WIT 901 WIFI → Configure). After the listener settings page, a second step appears:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| Enable MQTT forwarding | off | Master switch |
+| Topic prefix | `wit901` | Root topic segment |
+| Sensors to forward | – | Multi-select of available sensor values |
+| Publish interval | live | How often to publish (live, 1s, 5s, 10s, 30s, 1min, 5min, 15min, 1h, 6h, 12h, 24h, or custom) |
+| Custom interval | – | Free-form interval in seconds (min 0.2s), only used when "custom" is selected |
+| QoS level | 0 | MQTT QoS (0, 1, or 2) |
+
+### Topic Structure
+
+```
+<prefix>/<device_id>/<value_key>         — sensor value (retain=true)
+<prefix>/<device_id>/availability        — "online" / "offline" (retain=true, QoS 1)
+```
+
+Example with prefix `wit901` and device `WT5500008241`:
+
+```
+wit901/WT5500008241/roll_deg             → "2.15"
+wit901/WT5500008241/pitch_deg            → "-0.87"
+wit901/WT5500008241/temperature_c        → "23.4"
+wit901/WT5500008241/battery_percentage   → "85"
+wit901/WT5500008241/availability         → "online"
+```
+
+### Available Sensor Keys
+
+| Key | Description |
+|-----|-------------|
+| `roll_deg` | Roll (°) |
+| `pitch_deg` | Pitch (°) |
+| `yaw_deg` | Yaw (°) |
+| `temperature_c` | Temperature (°C) |
+| `battery_voltage_v` | Battery voltage (V) |
+| `battery_percentage` | Battery (%) |
+| `rssi_dbm` | Signal strength (dBm) |
+| `acc_x_g` | Acceleration X (g) |
+| `acc_y_g` | Acceleration Y (g) |
+| `acc_z_g` | Acceleration Z (g) |
+| `gyro_x_dps` | Gyroscope X (°/s) |
+| `gyro_y_dps` | Gyroscope Y (°/s) |
+| `gyro_z_dps` | Gyroscope Z (°/s) |
+| `mag_x_ut` | Magnetometer X (µT) |
+| `mag_y_ut` | Magnetometer Y (µT) |
+| `mag_z_ut` | Magnetometer Z (µT) |
+
+### Design Notes
+
+- **Retain = true** – values survive broker restarts; subscribers get the last known value immediately.
+- **Throttle-coupled** – MQTT publishing runs inside the existing entity update throttle gate. When set to "live", it publishes at the same rate as entity updates (max ~5 Hz). Larger intervals (e.g. 5min) add their own independent throttle on top.
+- **Serialized** – at most one MQTT publish cycle runs at a time, preventing task buildup at high frame rates.
+- **Availability** – the integration publishes `online`/`offline` to the availability topic whenever the sensor's connectivity status changes.
+- **Error handling** – if the MQTT integration is unavailable or publishing fails, a single warning is logged and further errors are silently suppressed until reload.
+
 ## Entities
 
 After successful setup, the following entities are created:
@@ -216,14 +284,16 @@ WT901WIFI Sensor  ──UDP/TCP──►  HA Listener (Port 1399)
                              WitDataCoordinator
                               (push, no polling)
                                      │
-                                     ▼
-                              Sensor Entities
+                              ┌──────┴──────┐
+                              ▼              ▼
+                       Sensor Entities   MQTT Broker
+                                        (optional)
 ```
 
 - **`protocol.py`** – Parser for 54-byte WT55 frames
 - **`listener.py`** – UDP/TCP asyncio listener with device ID filtering
-- **`coordinator.py`** – DataUpdateCoordinator (push-based, `update_interval=None`), offline detection, throttling (max 5 Hz)
-- **`config_flow.py`** – Multi-step config flow with optional WiFi provisioning and auto-discovery
+- **`coordinator.py`** – DataUpdateCoordinator (push-based, `update_interval=None`), offline detection, throttling (max 5 Hz), optional MQTT forwarding
+- **`config_flow.py`** – Multi-step config flow with optional WiFi provisioning and auto-discovery; 2-step options flow (listener → MQTT)
 - **`wifi_setup.py`** – ASCII commands for WiFi configuration (IPWIFI, UDPIP, TCPIP)
 
 ## Protocol Details

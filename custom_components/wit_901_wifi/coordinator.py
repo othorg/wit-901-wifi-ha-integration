@@ -20,6 +20,12 @@ from .const import (
     CONF_AUTO_REBOOT_INTERVAL,
     CONF_DEVICE_ID,
     CONF_LISTEN_PORT,
+    CONF_MQTT_ENABLED,
+    CONF_MQTT_INTERVAL,
+    CONF_MQTT_INTERVAL_CUSTOM,
+    CONF_MQTT_QOS,
+    CONF_MQTT_SENSORS,
+    CONF_MQTT_TOPIC_PREFIX,
     CONF_PROTOCOL,
     CONF_TARGET_IP,
     CONF_TIMEOUT_SECONDS,
@@ -27,12 +33,18 @@ from .const import (
     CONF_UPDATE_INTERVAL_CUSTOM,
     DEFAULT_AUTO_REBOOT_INTERVAL,
     DEFAULT_LISTEN_PORT,
+    DEFAULT_MQTT_ENABLED,
+    DEFAULT_MQTT_INTERVAL,
+    DEFAULT_MQTT_QOS,
+    DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_PROTOCOL,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     MIN_AUTO_REBOOT_S,
+    MIN_MQTT_INTERVAL_S,
     MIN_UPDATE_INTERVAL_S,
+    MQTT_INTERVAL_PRESETS,
     REBOOT_GRACE_PERIOD_S,
     UPDATE_INTERVAL_PRESETS,
 )
@@ -68,6 +80,16 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._auto_reboot_interval_s: int = self._resolve_auto_reboot_interval(entry_data)
         self._cancel_auto_reboot: Callable[[], None] | None = None
 
+        # MQTT forwarding state
+        self._mqtt_enabled: bool = entry_data.get(CONF_MQTT_ENABLED, DEFAULT_MQTT_ENABLED)
+        self._mqtt_topic_prefix: str = entry_data.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX)
+        self._mqtt_sensors: list[str] = entry_data.get(CONF_MQTT_SENSORS, [])
+        self._mqtt_qos: int = int(entry_data.get(CONF_MQTT_QOS, DEFAULT_MQTT_QOS))
+        self._mqtt_interval_s: float = self._resolve_mqtt_interval(entry_data)
+        self._mqtt_warned: bool = False
+        self._mqtt_publish_task: asyncio.Task[None] | None = None
+        self._last_mqtt_publish_mono: float = 0.0
+
     @property
     def last_source_ip(self) -> str | None:
         """Return the last known sensor source IP."""
@@ -93,6 +115,17 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         custom = entry_data.get(CONF_AUTO_REBOOT_CUSTOM)
         if custom is not None:
             return max(MIN_AUTO_REBOOT_S, int(custom))
+        return 0
+
+    @staticmethod
+    def _resolve_mqtt_interval(entry_data: dict[str, Any]) -> float:
+        """Resolve MQTT publish interval in seconds (0 = same as entity throttle)."""
+        preset = entry_data.get(CONF_MQTT_INTERVAL, DEFAULT_MQTT_INTERVAL)
+        if preset in MQTT_INTERVAL_PRESETS:
+            return MQTT_INTERVAL_PRESETS[preset]
+        custom = entry_data.get(CONF_MQTT_INTERVAL_CUSTOM)
+        if custom is not None:
+            return max(MIN_MQTT_INTERVAL_S, float(custom))
         return 0
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -125,6 +158,18 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         self._last_update_mono = now
         self.async_set_updated_data({**parsed, "online": True})
+
+        # MQTT forwarding — own throttle + serialized (max 1 task)
+        if self._mqtt_enabled:
+            mqtt_ok = (
+                self._mqtt_interval_s <= 0
+                or (now - self._last_mqtt_publish_mono >= self._mqtt_interval_s)
+            )
+            if mqtt_ok and (self._mqtt_publish_task is None or self._mqtt_publish_task.done()):
+                self._last_mqtt_publish_mono = now
+                self._mqtt_publish_task = self.hass.async_create_task(
+                    self._async_mqtt_publish(parsed)
+                )
 
     def _schedule_offline_timer(self) -> None:
         """Reset the offline timeout timer."""
@@ -162,6 +207,8 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._is_offline = True
         if self.data:
             self.async_set_updated_data({**self.data, "online": False})
+        if self._mqtt_enabled:
+            self.hass.async_create_task(self._async_mqtt_publish_availability("offline"))
 
     @callback
     def _deferred_offline_warning(self, _now: Any) -> None:
@@ -247,6 +294,53 @@ class WitDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise HomeAssistantError(
                     f"Reboot command failed for {self.device_id}: {err}"
                 ) from err
+
+    async def _async_mqtt_publish(self, parsed: dict[str, Any]) -> None:
+        """Publish selected sensor values to MQTT."""
+        try:
+            from homeassistant.components import mqtt  # noqa: PLC0415
+        except ImportError:
+            if not self._mqtt_warned:
+                _LOGGER.warning("MQTT forwarding enabled but MQTT integration not available")
+                self._mqtt_warned = True
+            return
+
+        try:
+            prefix = self._mqtt_topic_prefix
+            device_id = self.device_id
+            for value_key in self._mqtt_sensors:
+                value = parsed.get(value_key)
+                if value is not None:
+                    topic = f"{prefix}/{device_id}/{value_key}"
+                    await mqtt.async_publish(
+                        self.hass, topic, str(value),
+                        qos=self._mqtt_qos, retain=True,
+                    )
+            await mqtt.async_publish(
+                self.hass,
+                f"{prefix}/{device_id}/availability",
+                "online", qos=1, retain=True,
+            )
+        except Exception:  # noqa: BLE001
+            if not self._mqtt_warned:
+                _LOGGER.warning(
+                    "MQTT publish failed for %s — check MQTT integration",
+                    self.device_id,
+                )
+                self._mqtt_warned = True
+
+    async def _async_mqtt_publish_availability(self, status: str) -> None:
+        """Publish availability status to MQTT (best-effort)."""
+        try:
+            from homeassistant.components import mqtt  # noqa: PLC0415
+
+            await mqtt.async_publish(
+                self.hass,
+                f"{self._mqtt_topic_prefix}/{self.device_id}/availability",
+                status, qos=1, retain=True,
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     @callback
     def async_shutdown(self) -> None:

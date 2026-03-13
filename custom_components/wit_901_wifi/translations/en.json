@@ -63,7 +63,11 @@
       "sensor_unreachable": "Sensor host is not reachable from Home Assistant",
       "cannot_send_command": "Could not send provisioning command to sensor",
       "frame_timeout": "No sensor frame received within timeout",
-      "required": "Required field"
+      "required": "Required field",
+      "mqtt_not_configured": "MQTT integration is not configured. Set it up first.",
+      "invalid_mqtt_topic": "Invalid topic prefix (no wildcards, no empty segments)",
+      "invalid_mqtt_interval": "Invalid MQTT publish interval",
+      "invalid_mqtt_interval_custom": "Custom interval must be at least 0.2 seconds"
     },
     "abort": {
       "missing_listener_config": "Listener configuration is missing. Restart setup."
@@ -85,6 +89,18 @@
           "update_interval_custom": "Custom interval (seconds)",
           "auto_reboot_interval": "Auto-reboot interval",
           "auto_reboot_custom": "Custom reboot interval (seconds)"
+        }
+      },
+      "mqtt": {
+        "title": "MQTT forwarding",
+        "description": "Forward selected sensor values to an MQTT broker. Requires the MQTT integration.",
+        "data": {
+          "mqtt_enabled": "Enable MQTT forwarding",
+          "mqtt_topic_prefix": "Topic prefix",
+          "mqtt_sensors": "Sensors to forward",
+          "mqtt_interval": "Publish interval",
+          "mqtt_interval_custom": "Custom interval (seconds)",
+          "mqtt_qos": "QoS level"
         }
       }
     }

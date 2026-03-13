@@ -63,7 +63,11 @@
       "sensor_unreachable": "Sensor-Host ist von Home Assistant nicht erreichbar",
       "cannot_send_command": "Provisionierungsbefehl konnte nicht gesendet werden",
       "frame_timeout": "Kein Sensor-Frame innerhalb des Timeouts empfangen",
-      "required": "Pflichtfeld"
+      "required": "Pflichtfeld",
+      "mqtt_not_configured": "MQTT-Integration ist nicht konfiguriert. Bitte zuerst einrichten.",
+      "invalid_mqtt_topic": "Ungueltiges Topic-Praefix (keine Wildcards, keine leeren Segmente)",
+      "invalid_mqtt_interval": "Ungueltiges MQTT-Publish-Intervall",
+      "invalid_mqtt_interval_custom": "Eigenes Intervall muss mindestens 0,2 Sekunden betragen"
     },
     "abort": {
       "missing_listener_config": "Listener-Konfiguration fehlt. Setup neu starten."
@@ -85,6 +89,18 @@
           "update_interval_custom": "Benutzerdefiniertes Intervall (Sekunden)",
           "auto_reboot_interval": "Automatisches Neustart-Intervall",
           "auto_reboot_custom": "Benutzerdefiniertes Neustart-Intervall (Sekunden)"
+        }
+      },
+      "mqtt": {
+        "title": "MQTT-Weiterleitung",
+        "description": "Ausgewaehlte Sensordaten an einen MQTT-Broker weiterleiten. Erfordert die MQTT-Integration.",
+        "data": {
+          "mqtt_enabled": "MQTT-Weiterleitung aktivieren",
+          "mqtt_topic_prefix": "Topic-Praefix",
+          "mqtt_sensors": "Weiterzuleitende Sensoren",
+          "mqtt_interval": "Publish-Intervall",
+          "mqtt_interval_custom": "Eigenes Intervall (Sekunden)",
+          "mqtt_qos": "QoS-Stufe"
         }
       }
     }
