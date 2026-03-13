@@ -1,45 +1,48 @@
-## HACS Default Submission (Integration)
+# HACS Default Submission Checklist (WIT 901 WIFI)
 
-Repository: `othorg/wit-901-wifi-ha-integration`
-Category: `integration`
+Use this checklist before submitting to the official HACS default repository list.
 
-### 1. Preconditions
+## Repository readiness
 
-- Integration files exist under `custom_components/wit_901_wifi/`.
-- `manifest.json` includes required metadata (domain, name, version, docs, issue tracker, codeowners, config_flow).
-- `hacs.json` exists in repo root.
-- CI passes:
-  - Python lint/tests
-  - `hacs/action` (`category: integration`)
-  - `hassfest`
-- At least one tagged release exists (`vX.Y.Z`).
+- Public repository on GitHub
+- Default branch: `main`
+- Valid `hacs.json` in repo root
+- Integration code under `custom_components/wit_901_wifi/`
+- Valid `manifest.json` with matching version in `const.py`
+- `README.md` with install instructions and at least one image
+- License file present
+- GitHub Releases created from semver tags (`vX.Y.Z`)
 
-### 2. Manual GitHub setup (required)
+## CI/Validation readiness
 
-- Set repository description.
-- Add topics:
-  - `hacs`
-  - `home-assistant`
-  - `home-assistant-integration`
-  - `wit-motion`
-  - `wt901wifi`
+- HACS validation workflow green
+- Hassfest workflow green
+- Test and lint workflows green
 
-### 3. Add to HACS default list
+## Branding readiness
 
-1. Fork `https://github.com/hacs/default`
-2. Edit file `integration` in your fork.
-3. Add line:
+- Local integration brand assets:
+  - `custom_components/wit_901_wifi/brand/icon.png`
+  - `custom_components/wit_901_wifi/brand/icon@2x.png`
+  - `custom_components/wit_901_wifi/brand/dark_icon.png`
+  - `custom_components/wit_901_wifi/brand/dark_icon@2x.png`
+  - `custom_components/wit_901_wifi/brand/logo.png`
+  - `custom_components/wit_901_wifi/brand/logo@2x.png`
+  - `custom_components/wit_901_wifi/brand/dark_logo.png`
+  - `custom_components/wit_901_wifi/brand/dark_logo@2x.png`
+- Optional HACS/repo fallback assets:
+  - `hacs.png`
+  - `icon.png`
+  - `brand/*`
 
-```text
-othorg/wit-901-wifi-ha-integration
-```
+## Manual submission steps (maintainer)
 
-4. Keep alphabetical order.
-5. Open PR against `hacs/default`.
+1. Submit integration to HACS default list:
+   - Open: <https://github.com/hacs/default>
+   - Add repo in category **integration** (via PR).
+2. Submit domain branding to Home Assistant brands:
+   - Open: <https://github.com/home-assistant/brands>
+   - Add branding for domain `wit_901_wifi` (via PR).
+3. Wait for both PRs to be merged.
+4. Re-run HACS and clear frontend cache if icon/metadata is delayed.
 
-### 4. Suggested PR notes
-
-- Integration type: local push (`iot_class: local_push`)
-- Config Flow and Options Flow supported
-- Branded assets included
-- HACS validation, hassfest, and tests are green

@@ -6,6 +6,10 @@ Home Assistant custom integration for **WIT-Motion WT901WIFI** 9-axis IMU sensor
 
 The sensor streams data via WiFi (UDP or TCP) directly to Home Assistant – no cloud, no polling.
 
+## Preview
+
+![WIT 901 WIFI Integration Icon](icon.png)
+
 ## Features
 
 - **Local Push** – HA listens on a configurable port, the sensor pushes frames
