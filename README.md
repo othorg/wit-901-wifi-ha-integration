@@ -188,7 +188,13 @@ Forward selected sensor values to an MQTT broker — useful for sharing sensor d
 
 ### Configuration
 
-MQTT forwarding is configured in the **Options Flow** (Settings → Devices & Services → WIT 901 WIFI → Configure). After the listener settings page, a second step appears:
+MQTT forwarding is configured in the **Options Flow** (Settings → Devices & Services → WIT 901 WIFI → Configure).
+The options flow now starts with a menu:
+
+- **Listener & device settings**
+- **MQTT forwarding**
+
+Each section can be edited and saved independently; changes are merged with existing options.
 
 | Option | Default | Description |
 |--------|---------|-------------|
